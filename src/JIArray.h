@@ -9,58 +9,58 @@
 #include <tuple>
 #include <utility>
 
-#ifndef MYARRAY_OFFSET
-#define MYARRAY_OFFSET 1
+#ifndef JIARRAY_OFFSET
+#define JIARRAY_OFFSET 1
 #endif
 
-#ifdef MYARRAY_DEBUG
-#define MYARRAY_CHECK_NOT_ALLOCATED() assert(allocated == false)
-#define MYARRAY_CHECK_BOUND(i, beg, end) assert(i >= beg && i <= end)
-#define MYARRAY_CHECK_RANK(r1, r2) assert(r1 == r2)
-#define MYARRAY_CHECK_SIZE(r1, r2) assert(r1 == r2)
+#ifdef JIARRAY_DEBUG
+#define JIARRAY_CHECK_NOT_ALLOCATED() assert(allocated == false)
+#define JIARRAY_CHECK_BOUND(i, beg, end) assert(i >= beg && i <= end)
+#define JIARRAY_CHECK_RANK(r1, r2) assert(r1 == r2)
+#define JIARRAY_CHECK_SIZE(r1, r2) assert(r1 == r2)
 #else
-#define MYARRAY_CHECK_NOT_ALLOCATED()
-#define MYARRAY_CHECK_BOUND(i, beg, end)
-#define MYARRAY_CHECK_RANK(r1, r2)
-#define MYARRAY_CHECK_SIZE(r1, r2)
+#define JIARRAY_CHECK_NOT_ALLOCATED()
+#define JIARRAY_CHECK_BOUND(i, beg, end)
+#define JIARRAY_CHECK_RANK(r1, r2)
+#define JIARRAY_CHECK_SIZE(r1, r2)
 #endif
 
-#define MYARRAY_ALLOCATED_NONE 0
-#define MYARRAY_ALLOCATED_MEMORY 1
-#define MYARRAY_ALLOCATED_RANKSIZE 2
-#define MYARRAY_ALLOCATED_OFFSET 4
-#define MYARRAY_ALLOCATED_ALL 7
-#define MYARRAY_ALLOCATED_RANKSIZE_OFFSET 6
+#define JIARRAY_ALLOCATED_NONE 0
+#define JIARRAY_ALLOCATED_MEMORY 1
+#define JIARRAY_ALLOCATED_RANKSIZE 2
+#define JIARRAY_ALLOCATED_OFFSET 4
+#define JIARRAY_ALLOCATED_ALL 7
+#define JIARRAY_ALLOCATED_RANKSIZE_OFFSET 6
 
-template <class T, std::size_t SIZE, std::size_t OFFSET = MYARRAY_OFFSET>
+template <class T, std::size_t SIZE, std::size_t OFFSET = JIARRAY_OFFSET>
 class FastArray {
    public:
     T memory[SIZE]{};
 
    public:
     inline T &operator()(int i) {
-        MYARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return memory[i - OFFSET];
     }
     inline const T &operator()(int i) const {
-        MYARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return memory[i - OFFSET];
     }
 };
 
 #ifndef SOURCE1_H_
 #define SOURCE1_H_
-extern int64_t sizeOfMyArray;
+extern int64_t sizeOfJIArray;
 #endif
 
 template <class T, std::size_t RANK, class = std::make_index_sequence<RANK>>
-class MyArray;
+class JIArray;
 
 template <class T, std::size_t RANK, std::size_t... INTS>
-class MyArray<T, RANK, std::index_sequence<INTS...>> {
+class JIArray<T, RANK, std::index_sequence<INTS...>> {
    public:
     T *memory = nullptr;
-    int allocated = MYARRAY_ALLOCATED_NONE;
+    int allocated = JIARRAY_ALLOCATED_NONE;
     int size = 0;
     int rankSize[RANK]{};
     int offset[RANK]{};
@@ -73,35 +73,35 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     static const int RANK_5 = RANK - 5;
 
    private:
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
     int sizeOfRank[RANK]{};
 #endif
    private:
     void init(int i) {
         size = i;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = new T[size]{};
         for (int ioffset = 0; ioffset < 1; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
-        allocated = MYARRAY_ALLOCATED_ALL;
+        allocated = JIARRAY_ALLOCATED_ALL;
         sumOfOffset = offset[0];
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
 #endif
     };
 
     void init(int i, int j) {
         size = i * j;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = new T[size]{};
         for (int ioffset = 0; ioffset < 2; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         sumOfOffset = offset[0] + rankSize[1] * offset[1];
-        allocated = MYARRAY_ALLOCATED_ALL;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_ALL;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
 #endif
@@ -109,16 +109,16 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k) {
         size = i * j * k;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = new T[size]{};
         for (int ioffset = 0; ioffset < 3; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         rankSize[2] = rankSize[1] * j;
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2];
-        allocated = MYARRAY_ALLOCATED_ALL;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_ALL;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
         sizeOfRank[2] = k;
@@ -127,17 +127,17 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, int l) {
         size = i * j * k * l;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = new T[size]{};
         for (int ioffset = 0; ioffset < 4; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         rankSize[2] = rankSize[1] * j;
         rankSize[3] = rankSize[2] * k;
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3];
-        allocated = MYARRAY_ALLOCATED_ALL;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_ALL;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
         sizeOfRank[2] = k;
@@ -147,18 +147,18 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, int l, int m) {
         size = i * j * k * l * m;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = new T[size]{};
         for (int ioffset = 0; ioffset < 5; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         rankSize[2] = rankSize[1] * j;
         rankSize[3] = rankSize[2] * k;
         rankSize[4] = rankSize[3] * l;
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3] + rankSize[4] * offset[4];
-        allocated = MYARRAY_ALLOCATED_ALL;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_ALL;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
         sizeOfRank[2] = k;
@@ -169,29 +169,29 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, T *memory_) {
         size = i;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 1; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         sumOfOffset = offset[0];
-        allocated = MYARRAY_ALLOCATED_RANKSIZE_OFFSET;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
 #endif
     };
 
     void init(int i, int j, T *memory_) {
         size = i * j;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 2; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         sumOfOffset = offset[0] + rankSize[1] * offset[1];
-        allocated = MYARRAY_ALLOCATED_RANKSIZE_OFFSET;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
 #endif
@@ -199,16 +199,16 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, T *memory_) {
         size = i * j * k;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 3; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         rankSize[2] = rankSize[1] * j;
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2];
-        allocated = MYARRAY_ALLOCATED_RANKSIZE_OFFSET;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
         sizeOfRank[2] = k;
@@ -217,17 +217,17 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, int l, T *memory_) {
         size = i * j * k * l;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 4; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         rankSize[2] = rankSize[1] * j;
         rankSize[3] = rankSize[2] * k;
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3];
-        allocated = MYARRAY_ALLOCATED_RANKSIZE_OFFSET;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
         sizeOfRank[2] = k;
@@ -237,18 +237,18 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, int l, int m, T *memory_) {
         size = i * j * k * l * m;
-        sizeOfMyArray += sizeof(T) * size;
+        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 5; ioffset++)
-            offset[ioffset] = MYARRAY_OFFSET;
+            offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
         rankSize[1] = rankSize[0] * i;
         rankSize[2] = rankSize[1] * j;
         rankSize[3] = rankSize[2] * k;
         rankSize[4] = rankSize[3] * l;
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3] + rankSize[4] * offset[4];
-        allocated = MYARRAY_ALLOCATED_RANKSIZE_OFFSET;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
+#ifdef JIARRAY_DEBUG
         sizeOfRank[0] = i;
         sizeOfRank[1] = j;
         sizeOfRank[2] = k;
@@ -294,46 +294,46 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
    public:
     void destroy() {
-        if (allocated != MYARRAY_ALLOCATED_NONE) {
-            if ((allocated & MYARRAY_ALLOCATED_MEMORY) != 0 && memory != nullptr)
+        if (allocated != JIARRAY_ALLOCATED_NONE) {
+            if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && memory != nullptr)
                 delete[] memory;
             memory = nullptr;
-            allocated = MYARRAY_ALLOCATED_NONE;
+            allocated = JIARRAY_ALLOCATED_NONE;
             size = 0;
         }
     }
 
-    MyArray() {}
+    JIArray() {}
 
-    MyArray(const MyArray<T, RANK> &array) {
+    JIArray(const JIArray<T, RANK> &array) {
         size = array.size;
         memory = array.memory;
         std::copy((int *)array.rankSize, ((int *)array.rankSize) + RANK, rankSize);
         std::copy((int *)array.offset, ((int *)array.offset) + RANK, offset);
-        allocated = MYARRAY_ALLOCATED_NONE;
-#ifdef MYARRAY_DEBUG
+        allocated = JIARRAY_ALLOCATED_NONE;
+#ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
             sizeOfRank[i] = array.sizeOfRank[i];
 #endif
     }
 
-    virtual ~MyArray() {
+    virtual ~JIArray() {
         destroy();
     }
 
-    MyArray(decltype(INTS)... args) {
+    JIArray(decltype(INTS)... args) {
         init(args...);
     };
 
-    MyArray(T *memory_, decltype(INTS)... args) {
+    JIArray(T *memory_, decltype(INTS)... args) {
         init(args..., memory_);
     };
 
-    MyArray(T *memory_) : memory(memory_) {
+    JIArray(T *memory_) : memory(memory_) {
     }
 
-    MyArray(const int &size_, int *rankSize_, int *offset_, const int &sumOfOffset_, T *memory_
-#ifdef MYARRAY_DEBUG
+    JIArray(const int &size_, int *rankSize_, int *offset_, const int &sumOfOffset_, T *memory_
+#ifdef JIARRAY_DEBUG
             ,
             int sizeOfRank_[]) {
 #else
@@ -345,28 +345,28 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         std::copy(offset_, offset_ + RANK, offset);
         memory = memory_;
         sumOfOffset = sumOfOffset_;
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
             sizeOfRank[i] = sizeOfRank_[i];
 #endif
     };
 
-    //    MyArray(int l, int m, MyArray<T,RANK>* a) {
+    //    JIArray(int l, int m, JIArray<T,RANK>* a) {
     //        size = this->rankSize[RANK_2];
     //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l;
     //    };
     //
-    //    MyArray(int k, int l, int m, MyArray* a) {
+    //    JIArray(int k, int l, int m, JIArray* a) {
     //        size = this->rankSize[RANK_3];
     //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] * k;
     //    };
     //
-    //    MyArray(int j, int k, int l, int m, MyArray* a) {
+    //    JIArray(int j, int k, int l, int m, JIArray* a) {
     //        size = this->rankSize[RANK_4];
     //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] * k + this->rankSize[RANK_4] * j;
     //    };
     //
-    //    MyArray(int i, int j, int k, int l, int m, MyArray* a) {
+    //    JIArray(int i, int j, int k, int l, int m, JIArray* a) {
     //        size = this->rankSize[RANK_5];
     //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] * k + this->rankSize[RANK_4] * j +
     //                 this->rankSize[RANK_5] * i;
@@ -383,9 +383,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     };
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int m) {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 1);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+    inline JIArray<T, RANK2> slice(int m) {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
 
         int sumOfOffset = offset[0];
 
@@ -395,12 +395,12 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         auto *p_memory = memory;
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this->rankSize[RANK_1],
+        auto array = JIArray<T, RANK2>(this->rankSize[RANK_1],
                                        this->rankSize,
                                        this->offset,
                                        sumOfOffset,
                                        p_memory
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this->sizeOfRank
 #endif
@@ -409,10 +409,10 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int l, int m) {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 2);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+    inline JIArray<T, RANK2> slice(int l, int m) {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 2);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
@@ -421,9 +421,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this->rankSize[RANK_2], this->rankSize, this->offset, sumOfOffset,
+        auto array = JIArray<T, RANK2>(this->rankSize[RANK_2], this->rankSize, this->offset, sumOfOffset,
                                        this->memory + this->rankSize[RANK_1] * (m - offset[RANK_1]) + this->rankSize[RANK_2] * (l - offset[RANK_2])
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
                                            ,
                                        this->sizeOfRank
 #endif
@@ -432,11 +432,11 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int k, int l, int m) {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 3);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+    inline JIArray<T, RANK2> slice(int k, int l, int m) {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 3);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
@@ -445,8 +445,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
-        MyArray<T, RANK2> array = MyArray<T, RANK2>(this->rankSize[RANK_3], this->rankSize, this->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        JIArray<T, RANK2> array = JIArray<T, RANK2>(this->rankSize[RANK_3], this->rankSize, this->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                                     ,
                                                     this->sizeOfRank
 #endif
@@ -455,12 +455,12 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int j, int k, int l, int m) {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 4);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+    inline JIArray<T, RANK2> slice(int j, int k, int l, int m) {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 4);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
@@ -471,8 +471,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this->rankSize[RANK_4], this->rankSize, this->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        auto array = JIArray<T, RANK2>(this->rankSize[RANK_4], this->rankSize, this->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this->sizeOfRank
 #endif
@@ -481,13 +481,13 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int i, int j, int k, int l, int m) {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 5);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
-        MYARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
+    inline JIArray<T, RANK2> slice(int i, int j, int k, int l, int m) {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 5);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        JIARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
@@ -499,12 +499,12 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this->rankSize[RANK_5],
+        auto array = JIArray<T, RANK2>(this->rankSize[RANK_5],
                                        this->rankSize,
                                        this->offset,
                                        sumOfOffset,
                                        p_memory
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this->sizeOfRank
 #endif
@@ -513,10 +513,10 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int m) const {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 1);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        auto this_noconst = const_cast<MyArray<T, RANK> *>(this);
+    inline JIArray<T, RANK2> slice(int m) const {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        auto this_noconst = const_cast<JIArray<T, RANK> *>(this);
 
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
@@ -525,8 +525,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         auto *p_memory = memory;
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this_noconst->rankSize[RANK_1], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        auto array = JIArray<T, RANK2>(this_noconst->rankSize[RANK_1], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this_noconst->sizeOfRank
 #endif
@@ -535,11 +535,11 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int l, int m) const {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 2);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        auto this_noconst = const_cast<MyArray<T, RANK> *>(this);
+    inline JIArray<T, RANK2> slice(int l, int m) const {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 2);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        auto this_noconst = const_cast<JIArray<T, RANK> *>(this);
 
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
@@ -549,8 +549,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this_noconst->rankSize[RANK_2], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        auto array = JIArray<T, RANK2>(this_noconst->rankSize[RANK_2], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this_noconst->sizeOfRank
 #endif
@@ -559,12 +559,12 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int k, int l, int m) const {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 3);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        auto this_noconst = const_cast<MyArray<T, RANK> *>(this);
+    inline JIArray<T, RANK2> slice(int k, int l, int m) const {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 3);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        auto this_noconst = const_cast<JIArray<T, RANK> *>(this);
 
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
@@ -575,8 +575,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this_noconst->rankSize[RANK_3], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        auto array = JIArray<T, RANK2>(this_noconst->rankSize[RANK_3], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this_noconst->sizeOfRank
 #endif
@@ -585,13 +585,13 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int j, int k, int l, int m) const {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 4);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
-        auto this_noconst = const_cast<MyArray<T, RANK> *>(this);
+    inline JIArray<T, RANK2> slice(int j, int k, int l, int m) const {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 4);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        auto this_noconst = const_cast<JIArray<T, RANK> *>(this);
 
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
@@ -603,8 +603,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this_noconst->rankSize[RANK_4], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        auto array = JIArray<T, RANK2>(this_noconst->rankSize[RANK_4], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this_noconst->sizeOfRank
 #endif
@@ -613,14 +613,14 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     template <int RANK2>
-    inline MyArray<T, RANK2> slice(int i, int j, int k, int l, int m) const {
-        MYARRAY_CHECK_RANK(RANK, RANK2 + 5);
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
-        MYARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
-        auto this_noconst = const_cast<MyArray<T, RANK> *>(this);
+    inline JIArray<T, RANK2> slice(int i, int j, int k, int l, int m) const {
+        JIARRAY_CHECK_RANK(RANK, RANK2 + 5);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        JIARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
+        auto this_noconst = const_cast<JIArray<T, RANK> *>(this);
 
         int sumOfOffset = offset[0];
         for (int irank = 1; irank < RANK2; irank++)
@@ -633,8 +633,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
-        auto array = MyArray<T, RANK2>(this_noconst->rankSize[RANK_5], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
-#ifdef MYARRAY_DEBUG
+        auto array = JIArray<T, RANK2>(this_noconst->rankSize[RANK_5], this_noconst->rankSize, this_noconst->offset, sumOfOffset, p_memory
+#ifdef JIARRAY_DEBUG
                                        ,
                                        this_noconst->sizeOfRank
 #endif
@@ -655,31 +655,31 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     inline T *data(int m) {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[RANK_1]);
     }
 
     inline T *data(int l, int m) {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]);
     }
 
     inline T *data(int k, int l, int m) {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) + this->rankSize[RANK_3] * (k - offset[3]);
     }
 
     inline T *data(int j, int k, int l, int m) {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) +
@@ -687,11 +687,11 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     inline T *data(int i, int j, int k, int l, int m) {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
-        MYARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        JIARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) +
@@ -699,31 +699,31 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     inline T *data(int m) const {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[RANK_1]);
     }
 
     inline T *data(int l, int m) const {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]);
     }
 
     inline T *data(int k, int l, int m) const {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) + this->rankSize[RANK_3] * (k - offset[3]);
     }
 
     inline T *data(int j, int k, int l, int m) const {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) +
@@ -731,11 +731,11 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     inline T *data(int i, int j, int k, int l, int m) const {
-        MYARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
-        MYARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
+        JIARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
 
         return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) +
@@ -776,7 +776,7 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return rankSize;
     }
 
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
     inline const int *getSizeOfRank() const {
         return sizeOfRank;
     }
@@ -787,49 +787,49 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     inline T &operator()(int i) {
-        MYARRAY_CHECK_RANK(RANK, 1);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_RANK(RANK, 1);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         return memory[i - sumOfOffset];
     }
 
     inline T &operator()(int i, int j) {
-        MYARRAY_CHECK_RANK(RANK, 2);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_RANK(RANK, 2);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         return memory[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline T &operator()(int i, int j, int k) {
-        MYARRAY_CHECK_RANK(RANK, 3);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_RANK(RANK, 3);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline T &operator()(int i, int j, int k, int l) {
-        MYARRAY_CHECK_RANK(RANK, 4);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_RANK(RANK, 4);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline T &operator()(int i, int j, int k, int l, int m) {
-        MYARRAY_CHECK_RANK(RANK, 5);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        MYARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
+        JIARRAY_CHECK_RANK(RANK, 5);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
     inline T &operator()(const FastArray<int, RANK> &idx) {
         int pos = idx(1) - sumOfOffset;
-        MYARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + sizeOfRank[0] - 1);
         for (int i = 1; i < RANK; i++) {
-            MYARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizeOfRank[i] - 1);
+            JIARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizeOfRank[i] - 1);
             pos += rankSize[i] * idx(i + 1);
         }
 
@@ -838,9 +838,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     inline const T &operator()(const FastArray<int, RANK> &idx) const {
         int pos = idx(1) - sumOfOffset;
-        MYARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + sizeOfRank[0] - 1);
         for (int i = 1; i < RANK; i++) {
-            MYARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizeOfRank[i] - 1);
+            JIARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizeOfRank[i] - 1);
             pos += rankSize[i] * idx(i + 1);
         }
 
@@ -848,127 +848,127 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
     }
 
     inline const T &operator()(int i) const {
-        MYARRAY_CHECK_RANK(RANK, 1);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_RANK(RANK, 1);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         return memory[i - sumOfOffset];
     }
 
     inline const T &operator()(int i, int j) const {
-        MYARRAY_CHECK_RANK(RANK, 2);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_RANK(RANK, 2);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         return memory[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline const T &operator()(int i, int j, int k) const {
-        MYARRAY_CHECK_RANK(RANK, 3);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_RANK(RANK, 3);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline const T &operator()(int i, int j, int k, int l) const {
-        MYARRAY_CHECK_RANK(RANK, 4);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_RANK(RANK, 4);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline const T &operator()(int i, int j, int k, int l, int m) const {
-        MYARRAY_CHECK_RANK(RANK, 5);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        MYARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
+        JIARRAY_CHECK_RANK(RANK, 5);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
     inline const T &at(int i) const {
-        MYARRAY_CHECK_RANK(RANK, 1);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_RANK(RANK, 1);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         return memory[i - sumOfOffset];
     }
 
     inline const T &at(int i, int j) const {
-        MYARRAY_CHECK_RANK(RANK, 2);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_RANK(RANK, 2);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         return memory[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline const T &at(int i, int j, int k) const {
-        MYARRAY_CHECK_RANK(RANK, 3);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_RANK(RANK, 3);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline const T &at(int i, int j, int k, int l) const {
-        MYARRAY_CHECK_RANK(RANK, 4);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_RANK(RANK, 4);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline const T &at(int i, int j, int k, int l, int m) const {
-        MYARRAY_CHECK_RANK(RANK, 5);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        MYARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
+        JIARRAY_CHECK_RANK(RANK, 5);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
     inline T &at(int i) {
-        MYARRAY_CHECK_RANK(RANK, 1);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_RANK(RANK, 1);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         return memory[i - sumOfOffset];
     }
 
     inline T &at(int i, int j) {
-        MYARRAY_CHECK_RANK(RANK, 2);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_RANK(RANK, 2);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         return memory[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline T &at(int i, int j, int k) {
-        MYARRAY_CHECK_RANK(RANK, 3);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_RANK(RANK, 3);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline T &at(int i, int j, int k, int l) {
-        MYARRAY_CHECK_RANK(RANK, 4);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_RANK(RANK, 4);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline T &at(int i, int j, int k, int l, int m) {
-        MYARRAY_CHECK_RANK(RANK, 5);
-        MYARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        MYARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        MYARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        MYARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        MYARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
+        JIARRAY_CHECK_RANK(RANK, 5);
+        JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
+        JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
+        JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
+        JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
+        JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
         return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
-    inline MyArray<T, RANK> &operator=(const std::initializer_list<T> &list) {
-        MYARRAY_CHECK_SIZE(this->size, list.size());
+    inline JIArray<T, RANK> &operator=(const std::initializer_list<T> &list) {
+        JIARRAY_CHECK_SIZE(this->size, list.size());
         int idx = 0;
         for (const T &val : list) {
             memory[idx++] = val;
@@ -976,7 +976,7 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return *this;
     }
 
-    inline MyArray<T, RANK> &operator=(const T &val) {
+    inline JIArray<T, RANK> &operator=(const T &val) {
         for (int i = 0; i < size; ++i) {
             memory[i] = val;
         }
@@ -984,7 +984,7 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return *this;
     }
 
-    inline MyArray<T, RANK> &operator=(const T *val) {
+    inline JIArray<T, RANK> &operator=(const T *val) {
         for (int i = 0; i < size; ++i) {
             memory[i] = val[i];
         }
@@ -992,8 +992,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return *this;
     }
 
-    inline MyArray<T, RANK> &operator=(const MyArray<T, RANK> &array) {
-        if (allocated == MYARRAY_ALLOCATED_NONE && memory == nullptr) {
+    inline JIArray<T, RANK> &operator=(const JIArray<T, RANK> &array) {
+        if (allocated == JIARRAY_ALLOCATED_NONE && memory == nullptr) {
             size = array.getSize();
 
             auto arrayRankSize = array.getRankSize();
@@ -1011,9 +1011,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
             sumOfOffset = array.sumOfOffset;
 
-            allocated = MYARRAY_ALLOCATED_ALL;
+            allocated = JIARRAY_ALLOCATED_ALL;
 
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
             auto arraySizeOfRank = array.getSizeOfRank();
             for (int i = 0; i < RANK; i++)
                 sizeOfRank[i] = arraySizeOfRank[i];
@@ -1021,8 +1021,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
             return *this;
         } else {
-#ifdef MYARRAY_DEBUG
-            MYARRAY_CHECK_SIZE(size, array.getSize());
+#ifdef JIARRAY_DEBUG
+            JIARRAY_CHECK_SIZE(size, array.getSize());
 
             auto arraySizeOfRank = array.getSizeOfRank();
             auto arrayOffset = array.getOffset();
@@ -1039,9 +1039,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         }
     }
 
-    inline MyArray<T, RANK> operator+(const MyArray<T, RANK> &array) {
-        MYARRAY_CHECK_SIZE(size, array.size);
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator+(const JIArray<T, RANK> &array) {
+        JIARRAY_CHECK_SIZE(size, array.size);
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] + array.memory[i];
@@ -1049,9 +1049,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> operator+(const MyArray<T, RANK> &array) const {
-        MYARRAY_CHECK_SIZE(size, array.size);
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator+(const JIArray<T, RANK> &array) const {
+        JIARRAY_CHECK_SIZE(size, array.size);
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] + array.memory[i];
@@ -1059,9 +1059,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> operator-(const MyArray<T, RANK> &array) {
-        MYARRAY_CHECK_SIZE(size, array.size);
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator-(const JIArray<T, RANK> &array) {
+        JIARRAY_CHECK_SIZE(size, array.size);
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] - array.memory[i];
@@ -1069,8 +1069,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> friend operator-(const MyArray<T, RANK> &array) {
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> friend operator-(const JIArray<T, RANK> &array) {
+        JIArray<T, RANK> out;
         out = array;
         for (int i = 0; i < out.size; ++i) {
             out.memory[i] = -out.memory[i];
@@ -1078,9 +1078,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> operator-(const MyArray<T, RANK> &array) const {
-        MYARRAY_CHECK_SIZE(size, array.size);
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator-(const JIArray<T, RANK> &array) const {
+        JIARRAY_CHECK_SIZE(size, array.size);
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] - array.memory[i];
@@ -1088,9 +1088,9 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> operator*(const MyArray<T, RANK> &array) {
-        MYARRAY_CHECK_SIZE(size, array.size);
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator*(const JIArray<T, RANK> &array) {
+        JIARRAY_CHECK_SIZE(size, array.size);
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] * array.memory[i];
@@ -1098,8 +1098,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> operator*(const T &val) {
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator*(const T &val) {
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] * val;
@@ -1107,26 +1107,26 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return out;
     }
 
-    inline MyArray<T, RANK> &operator*=(const T &val) {
+    inline JIArray<T, RANK> &operator*=(const T &val) {
         for (int i = 0; i < size; ++i) {
             this->memory[i] *= val;
         }
         return *this;
     }
 
-    inline MyArray<T, RANK> operator*(const MyArray<T, RANK> &array) const {
-        MyArray<T, RANK> sum;
+    inline JIArray<T, RANK> operator*(const JIArray<T, RANK> &array) const {
+        JIArray<T, RANK> sum;
 
         sum.size = array.size;
         sum.memory = new T[sum.size];
-        sum.allocated = MYARRAY_ALLOCATED_ALL;
+        sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < size; ++i) {
             sum.memory[i] = this->memory[i] * array.memory[i];
         }
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
             sum.sizeOfRank[i] = array.sizeOfRank[i];
 #endif
@@ -1141,8 +1141,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         }
     }
 
-    inline MyArray<T, RANK> operator/(const T &val) {
-        MyArray<T, RANK> out;
+    inline JIArray<T, RANK> operator/(const T &val) {
+        JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < size; ++i) {
             out.memory[i] = this->memory[i] / val;
@@ -1159,25 +1159,25 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return sum;
     }
 
-    inline MyArray<T, RANK> copy() const {
-        MyArray<T, RANK> array;
+    inline JIArray<T, RANK> copy() const {
+        JIArray<T, RANK> array;
         array = *this;
         return array;
     }
 
-    inline MyArray<T, RANK> friend operator+(const T &val, const MyArray<T, RANK> &array) {
-        MyArray<T, RANK> sum;
+    inline JIArray<T, RANK> friend operator+(const T &val, const JIArray<T, RANK> &array) {
+        JIArray<T, RANK> sum;
 
         sum.size = array.size;
         sum.memory = new T[sum.size];
-        sum.allocated = MYARRAY_ALLOCATED_ALL;
+        sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < sum.size; ++i) {
             sum.memory[i] = val + array.memory[i];
         }
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
             sum.sizeOfRank[i] = array.sizeOfRank[i];
 #endif
@@ -1185,19 +1185,19 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return sum;
     }
 
-    inline MyArray<T, RANK> friend operator*(const T &val, const MyArray<T, RANK> &array) {
-        MyArray<T, RANK> sum;
+    inline JIArray<T, RANK> friend operator*(const T &val, const JIArray<T, RANK> &array) {
+        JIArray<T, RANK> sum;
 
         sum.size = array.size;
         sum.memory = new T[sum.size];
-        sum.allocated = MYARRAY_ALLOCATED_ALL;
+        sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < sum.size; ++i) {
             sum.memory[i] = val * array.memory[i];
         }
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
             sum.sizeOfRank[i] = array.sizeOfRank[i];
 #endif
@@ -1205,19 +1205,19 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return sum;
     }
 
-    inline MyArray<T, RANK> friend operator/(const T &val, const MyArray<T, RANK> &array) {
-        MyArray<T, RANK> sum;
+    inline JIArray<T, RANK> friend operator/(const T &val, const JIArray<T, RANK> &array) {
+        JIArray<T, RANK> sum;
 
         sum.size = array.size;
         sum.memory = new T[sum.size];
-        sum.allocated = MYARRAY_ALLOCATED_ALL;
+        sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < sum.size; ++i) {
             sum.memory[i] = val / array.memory[i];
         }
-#ifdef MYARRAY_DEBUG
+#ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
             sum.sizeOfRank[i] = array.sizeOfRank[i];
 #endif
@@ -1225,12 +1225,12 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         return sum;
     }
 
-    inline T friend dot(const MyArray<T, RANK> &array1, const MyArray<T, RANK> &array2) {
-#ifdef MYARRAY_DEBUG
+    inline T friend dot(const JIArray<T, RANK> &array1, const JIArray<T, RANK> &array2) {
+#ifdef JIARRAY_DEBUG
         for (int rank = 0; rank < RANK; ++rank) {
             assert(array1.sizeOfRank[rank] == array2.sizeOfRank[rank]);
             assert(array1.offset[rank] == array2.offset[rank]);
-            MYARRAY_CHECK_SIZE(array1.size, array2.size);
+            JIARRAY_CHECK_SIZE(array1.size, array2.size);
         }
 #endif
 
@@ -1268,8 +1268,8 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
 
     inline FastArray<int, RANK> maxloc(int from, int to) {
         int maxloc = 0;
-        T maxval = memory[from - MYARRAY_OFFSET];
-        for (int i = from - MYARRAY_OFFSET + 1; i < to - MYARRAY_OFFSET; ++i) {
+        T maxval = memory[from - JIARRAY_OFFSET];
+        for (int i = from - JIARRAY_OFFSET + 1; i < to - JIARRAY_OFFSET; ++i) {
             if (memory[i] > maxval) {
                 maxloc = i;
                 maxval = memory[i];
@@ -1279,10 +1279,10 @@ class MyArray<T, RANK, std::index_sequence<INTS...>> {
         FastArray<int, RANK> maxLocation;
 
         for (int rank = RANK - 1; rank > 0; ++rank) {
-            maxLocation.memory[rank] = maxloc / rankSize[rank] + MYARRAY_OFFSET;
+            maxLocation.memory[rank] = maxloc / rankSize[rank] + JIARRAY_OFFSET;
             maxloc -= maxLocation.memory[rank] * rankSize[rank];
         }
-        maxLocation.memory[0] = maxloc + MYARRAY_OFFSET;
+        maxLocation.memory[0] = maxloc + JIARRAY_OFFSET;
         return maxLocation;
     }
 
