@@ -9,6 +9,7 @@
 #include <tuple>
 #include <utility>
 
+namespace dnegri {
 #ifndef JIARRAY_OFFSET
 #define JIARRAY_OFFSET 1
 #endif
@@ -169,7 +170,6 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, T *memory_) {
         size = i;
-        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 1; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
@@ -183,7 +183,6 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, T *memory_) {
         size = i * j;
-        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 2; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
@@ -199,7 +198,6 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, T *memory_) {
         size = i * j * k;
-        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 3; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
@@ -217,7 +215,6 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, int l, T *memory_) {
         size = i * j * k * l;
-        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 4; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
@@ -237,7 +234,6 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 
     void init(int i, int j, int k, int l, int m, T *memory_) {
         size = i * j * k * l * m;
-        sizeOfJIArray += sizeof(T) * size;
         memory = memory_;
         for (int ioffset = 0; ioffset < 5; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
@@ -295,8 +291,10 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
    public:
     void destroy() {
         if (allocated != JIARRAY_ALLOCATED_NONE) {
-            if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && memory != nullptr)
+            if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && memory != nullptr) {
+                sizeOfJIArray -= size;
                 delete[] memory;
+            }
             memory = nullptr;
             allocated = JIARRAY_ALLOCATED_NONE;
             size = 0;
@@ -1369,3 +1367,4 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
                             alloc04,     \
                             alloc03,     \
                             alloc02)(__VA_ARGS__)
+}
