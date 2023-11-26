@@ -6,10 +6,11 @@
 #include <cstddef>  // For std::ptrdiff_t
 #include <iterator>
 #include <iterator>  // For std::forward_iterator_tag
+#include <string>
 #include <tuple>
 #include <utility>
 
-namespace dnegri {
+namespace dnegri::jiarray {
 #ifndef JIARRAY_OFFSET
 #define JIARRAY_OFFSET 1
 #endif
@@ -39,6 +40,41 @@ class FastArray {
     T memory[SIZE]{};
 
    public:
+    FastArray() {
+    }
+
+    FastArray(std::initializer_list<T> arrays) {
+        int idx = -1;
+        for (const auto &value : arrays) {
+            memory[++idx] = value;
+        }
+    }
+
+    FastArray(const T &val) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = val;
+        }
+    }
+
+    template <size_t array_size>
+    FastArray(T (&a)[array_size]) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = a[i];
+        }
+    }
+
+    inline int findFirst(const T &val) {
+        int pos = OFFSET - 1;
+        for (size_t i = 0; i < SIZE; i++) {
+            if (memory[i] == val) {
+                pos = i + OFFSET;
+                break;
+            }
+        }
+
+        return pos;
+    }
+
     inline T &operator()(int i) {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return memory[i - OFFSET];
@@ -46,6 +82,111 @@ class FastArray {
     inline const T &operator()(int i) const {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return memory[i - OFFSET];
+    }
+    inline FastArray<T, SIZE, OFFSET> &operator=(const FastArray<T, SIZE, OFFSET> &array) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = array.memory[i];
+        }
+        return *this;
+    }
+    inline FastArray<T, SIZE, OFFSET> &operator=(const T &val) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = val;
+        }
+        return *this;
+    }
+};
+
+template <class T, std::size_t SIZE1, std::size_t SIZE2, std::size_t OFFSET = JIARRAY_OFFSET>
+class FastArray2D {
+   public:
+    const int SIZE = SIZE1 * SIZE2;
+    T memory[SIZE1 * SIZE2]{};
+
+   public:
+    FastArray2D() {
+    }
+
+    FastArray2D(std::initializer_list<T> arrays) {
+        int idx = -1;
+        for (const auto &value : arrays) {
+            memory[++idx] = value;
+        }
+    }
+
+    FastArray2D(const T &val) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = val;
+        }
+    }
+
+    template <size_t array_size>
+    FastArray2D(T (&a)[array_size]) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = a[i];
+        }
+    }
+
+    inline T &operator()(int i, int j) {
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE1 - 1);
+        JIARRAY_CHECK_BOUND(j, OFFSET, OFFSET + SIZE2 - 1);
+        return memory[(j - OFFSET) * SIZE1 + i - OFFSET];
+    }
+    inline const T &operator()(int i, int j) const {
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE1 - 1);
+        JIARRAY_CHECK_BOUND(j, OFFSET, OFFSET + SIZE2 - 1);
+        return memory[(j - OFFSET) * SIZE1 + i - OFFSET];
+    }
+    inline FastArray2D<T, SIZE1, SIZE2, OFFSET> &operator=(const FastArray2D<T, SIZE1, SIZE2, OFFSET> &array) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = array.memory[i];
+        }
+        return *this;
+    }
+    inline FastArray2D<T, SIZE1, SIZE2, OFFSET> &operator=(const T &val) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = val;
+        }
+        return *this;
+    }
+};
+
+template <std::size_t SIZE, std::size_t OFFSET = JIARRAY_OFFSET>
+class StringFastArray {
+   public:
+    std::string memory[SIZE];
+
+   public:
+    StringFastArray() {
+    }
+    // template<size_t array_size>
+    // template<typename... Ts>
+    StringFastArray(std::initializer_list<const char *> strings) {
+        int idx = -1;
+        for (const auto &string : strings) {
+            memory[++idx] = string;
+        }
+    }
+
+    inline std::string &operator()(int i) {
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
+        return memory[i - OFFSET];
+    }
+    inline const std::string &operator()(int i) const {
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
+        return memory[i - OFFSET];
+    }
+    inline StringFastArray<SIZE, OFFSET> &operator=(const StringFastArray<SIZE, OFFSET> &array) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = array.memory[i];
+        }
+        return *this;
+    }
+    inline StringFastArray<SIZE, OFFSET> &operator=(const std::string &val) {
+        for (size_t i = 0; i < SIZE; i++) {
+            memory[i] = val;
+        }
+        return *this;
     }
 };
 
@@ -168,6 +309,29 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 #endif
     };
 
+    void init(int i, int j, int k, int l, int m, int n) {
+        size = i * j * k * l * m * n;
+        sizeOfJIArray += sizeof(T) * size;
+        memory = new T[size]{};
+        for (int ioffset = 0; ioffset < 6; ioffset++)
+            offset[ioffset] = JIARRAY_OFFSET;
+        rankSize[0] = 1;
+        rankSize[1] = rankSize[0] * i;
+        rankSize[2] = rankSize[1] * j;
+        rankSize[3] = rankSize[2] * k;
+        rankSize[4] = rankSize[3] * l;
+        rankSize[5] = rankSize[4] * m;
+        sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3] + rankSize[4] * offset[4] + rankSize[5] * offset[5];
+        allocated = JIARRAY_ALLOCATED_ALL;
+#ifdef JIARRAY_DEBUG
+        sizeOfRank[0] = i;
+        sizeOfRank[1] = j;
+        sizeOfRank[2] = k;
+        sizeOfRank[3] = l;
+        sizeOfRank[4] = m;
+        sizeOfRank[5] = n;
+#endif
+    };
     void init(int i, T *memory_) {
         size = i;
         memory = memory_;
@@ -253,6 +417,29 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 #endif
     };
 
+    void init(int i, int j, int k, int l, int m, int n, T *memory_) {
+        size = i * j * k * l * m * n;
+        memory = memory_;
+        for (int ioffset = 0; ioffset < 6; ioffset++)
+            offset[ioffset] = JIARRAY_OFFSET;
+        rankSize[0] = 1;
+        rankSize[1] = rankSize[0] * i;
+        rankSize[2] = rankSize[1] * j;
+        rankSize[3] = rankSize[2] * k;
+        rankSize[4] = rankSize[3] * l;
+        rankSize[5] = rankSize[4] * m;
+        sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3] + rankSize[4] * offset[4] + rankSize[5] * offset[5];
+        allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
+#ifdef JIARRAY_DEBUG
+        sizeOfRank[0] = i;
+        sizeOfRank[1] = j;
+        sizeOfRank[2] = k;
+        sizeOfRank[3] = l;
+        sizeOfRank[4] = m;
+        sizeOfRank[5] = n;
+#endif
+    };
+
     void setOffset(int i) {
         this->offset[0] = i;
         sumOfOffset = offset[0];
@@ -288,6 +475,16 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
         sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3] + rankSize[4] * offset[4];
     }
 
+    void setOffset(int i, int j, int k, int l, int m, int n) {
+        this->offset[0] = i;
+        this->offset[1] = j;
+        this->offset[2] = k;
+        this->offset[3] = l;
+        this->offset[4] = m;
+        this->offset[5] = n;
+        sumOfOffset = offset[0] + rankSize[1] * offset[1] + rankSize[2] * offset[2] + rankSize[3] * offset[3] + rankSize[4] * offset[4] + rankSize[5] * offset[5];
+    }
+
    public:
     void destroy() {
         if (allocated != JIARRAY_ALLOCATED_NONE) {
@@ -299,6 +496,16 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
             allocated = JIARRAY_ALLOCATED_NONE;
             size = 0;
         }
+    }
+
+    void erase() {
+        destroy();
+        std::fill(rankSize, rankSize + RANK, 0);
+        std::fill(offset, offset + RANK, 0);
+        sumOfOffset = 0;
+#ifdef JIARRAY_DEBUG
+        std::fill(sizeOfRank, sizeOfRank + RANK, 0);
+#endif
     }
 
     JIArray() {}
@@ -640,7 +847,11 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
         return array;
     }
 
-    inline T *getMemory(int idx) {
+    inline T *getMemory(int idx = 0) {
+        return memory + idx;
+    }
+
+    inline const T *getMemory(int idx = 0) const {
         return memory + idx;
     }
 
@@ -1037,6 +1248,32 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
         }
     }
 
+    inline bool operator==(const JIArray<T, RANK> &array) const {
+        if (size != array.size) return false;
+
+        for (int i = 0; i < size; ++i) {
+            if (array.memory[i] != this->memory[i]) return false;
+        }
+
+        return true;
+    }
+
+    inline JIArray<T, RANK> &operator+=(const T &val) {
+        for (int i = 0; i < size; ++i) {
+            this->memory[i] += val;
+        }
+        return *this;
+    }
+
+    inline JIArray<T, RANK> operator+=(const JIArray<T, RANK> &array) {
+        JIARRAY_CHECK_SIZE(size, array.size);
+
+        for (int i = 0; i < size; ++i) {
+            this->memory[i] = this->memory[i] + array.memory[i];
+        }
+        return *this;
+    }
+
     inline JIArray<T, RANK> operator+(const JIArray<T, RANK> &array) {
         JIARRAY_CHECK_SIZE(size, array.size);
         JIArray<T, RANK> out;
@@ -1139,6 +1376,15 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
         }
     }
 
+    inline JIArray<T, RANK> operator/=(const JIArray<T, RANK> &array) {
+        JIARRAY_CHECK_SIZE(size, array.size);
+
+        for (int i = 0; i < size; ++i) {
+            this->memory[i] = this->memory[i] / array.memory[i];
+        }
+        return *this;
+    }
+
     inline JIArray<T, RANK> operator/(const T &val) {
         JIArray<T, RANK> out;
         out = *this;
@@ -1239,6 +1485,35 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
         return sum;
     }
 
+    inline FastArray<int, RANK> findFirst(const T &item) const {
+        int loc = -1;
+        T value;
+        for (int i = 0; i < this->size; ++i) {
+            if (memory[i] == item) {
+                loc = i;
+                value = memory[i];
+                break;
+            }
+        }
+
+        FastArray<int, RANK> location;
+        location = (-1 + JIARRAY_OFFSET);
+
+        if (loc == -1) return location;
+
+        for (int rank = RANK - 1; rank > 0; --rank) {
+            location.memory[rank] = loc / rankSize[rank];
+            loc -= (location.memory[rank]) * rankSize[rank];
+        }
+        location.memory[0] = loc;
+
+        for (int rank = 0; rank < RANK; ++rank) {
+            location.memory[rank] += offset[rank];
+        }
+
+        return location;
+    }
+
     inline FastArray<int, RANK> maxloc() {
         int maxloc = 0;
         T maxval = memory[0];
@@ -1284,6 +1559,20 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
         return maxLocation;
     }
 
+    inline void shareWith(const JIArray<T, RANK> &array) {
+        JIARRAY_CHECK_NOT_ALLOCATED();
+        
+        size = array.size;
+        memory = array.memory;
+        std::copy((int *)array.rankSize, ((int *)array.rankSize) + RANK, rankSize);
+        std::copy((int *)array.offset, ((int *)array.offset) + RANK, offset);
+        allocated = JIARRAY_ALLOCATED_NONE;
+#ifdef JIARRAY_DEBUG
+        for (int i = 0; i < RANK; i++)
+            sizeOfRank[i] = array.sizeOfRank[i];
+#endif
+    }
+
     struct Iterator {
         using iterator_category = std::forward_iterator_tag;
         using difference_type = std::ptrdiff_t;
@@ -1318,6 +1607,12 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
    public:
     Iterator begin() { return Iterator(memory); };
     Iterator end() { return Iterator(memory + size); };  // 200 is out of bounds
+
+   public:
+    std::vector<T> convertToVector() {
+        std::vector<T> vec(memory, memory + size);
+        return vec;
+    }
 };
 
 #define alloc1(array, i) array.setSize(i);
@@ -1325,10 +1620,12 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 #define alloc3(array, i, j, k) array.setSize(i, j, k);
 #define alloc4(array, m, i, j, k) array.setSize(m, i, j, k);
 #define alloc5(array, m, i, j, k, l) array.setSize(m, i, j, k, l);
+#define alloc6(array, m, i, j, k, l, n) array.setSize(m, i, j, k, l, n);
 
-#define allocx(array, m, i, j, k, l, FUNC, ...) FUNC
+#define allocx(array, m, i, j, k, l, n, FUNC, ...) FUNC
 
 #define alloc(...) allocx(__VA_ARGS__, \
+                          alloc6,      \
                           alloc5,      \
                           alloc4,      \
                           alloc3,      \
@@ -1367,4 +1664,47 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
                             alloc04,     \
                             alloc03,     \
                             alloc02)(__VA_ARGS__)
-}
+
+#define fbool(i) FastArray<bool, i>
+#define fint(i) FastArray<int, i>
+#define ffloat(i) FastArray<float, i>
+#define fdouble(i) FastArray<double, i>
+#define fstring(i) StringFastArray<i>
+
+#define fbool2(i, j) FastArray<bool, i, j>
+#define fint2(i, j) FastArray<int, i, j>
+#define ffloat2(i, j) FastArray<float, i, j>
+#define fdouble2(i, j) FastArray<double, i, j>
+
+#define bool1 JIArray<bool, 1>
+#define bool2 JIArray<bool, 2>
+#define bool3 JIArray<bool, 3>
+#define bool4 JIArray<bool, 4>
+#define bool5 JIArray<bool, 5>
+#define int1 JIArray<int, 1>
+#define int2 JIArray<int, 2>
+#define int3 JIArray<int, 3>
+#define int4 JIArray<int, 4>
+#define int5 JIArray<int, 5>
+#define double1 JIArray<double, 1>
+#define double2 JIArray<double, 2>
+#define double3 JIArray<double, 3>
+#define double4 JIArray<double, 4>
+#define double5 JIArray<double, 5>
+#define double6 JIArray<double, 6>
+
+#define float1 JIArray<float, 1>
+#define float2 JIArray<float, 2>
+#define float3 JIArray<float, 3>
+#define float4 JIArray<float, 4>
+#define float5 JIArray<float, 5>
+
+#define string1 JIArray<string, 1>
+#define string2 JIArray<string, 2>
+#define string3 JIArray<string, 3>
+#define string4 JIArray<string, 4>
+#define string5 JIArray<string, 5>
+
+#define ffor(i, begin, end) for (int i = begin; i <= end; ++i)
+#define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+}  // namespace dnegri
