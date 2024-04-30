@@ -1,25 +1,31 @@
 #pragma once
-#include <highfive/H5File.hpp>
 #include <JIArray.h>
+#include <highfive/H5File.hpp>
 
 using namespace HighFive;
 using namespace HighFive::details;
 
 template <typename T, size_t N>
 struct inspector<dnegri::jiarray::JIArray<T, N>> {
-    using type = dnegri::jiarray::JIArray<T, N>;
+    using type       = dnegri::jiarray::JIArray<T, N>;
     using value_type = unqualified_t<T>;
-    using base_type = typename inspector<value_type>::base_type;
-    using hdf5_type = typename inspector<value_type>::hdf5_type;
+    using base_type  = typename inspector<value_type>::base_type;
+    using hdf5_type  = typename inspector<value_type>::hdf5_type;
 
-    static constexpr size_t ndim = 1;
-    static constexpr size_t recursive_ndim = ndim;
-    static constexpr bool is_trivially_copyable = std::is_trivially_copyable<value_type>::value &&
+    static constexpr size_t ndim                  = N;
+    static constexpr size_t recursive_ndim        = ndim;
+    static constexpr bool   is_trivially_copyable = std::is_trivially_copyable<value_type>::value &&
                                                   inspector<value_type>::is_trivially_copyable;
 
     static std::vector<size_t> getDimensions(const type& val) {
         std::vector<size_t> sizes;
-        sizes.push_back(val.getSize());        
+
+        int prev_size = val.rankSize[0];
+        for (size_t i = 1; i < N; ++i) {
+            sizes.push_back(val.rankSize[i] / prev_size);
+            prev_size = val.rankSize[i];
+        }
+        sizes.push_back(val.size() / prev_size);
         return sizes;
     }
 
@@ -32,11 +38,10 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
     }
 
     static void prepare(type& val, const std::vector<size_t>& dims) {
-        // val.setSize(dims);
-        // std::vector<size_t> next_dims(dims.begin() + 1, dims.end());
-        // for (auto&& e: val) {
-        //     inspector<value_type>::prepare(e, next_dims);
-        // }
+        if (val.data() == nullptr) throw std::runtime_error("JIArray is not allocated");
+
+        auto this_size = getDimensions(val);
+        if (this_size != dims) throw std::runtime_error("Mismatched dimensions");
     }
 
     static hdf5_type* data(type& val) {
@@ -55,11 +60,11 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
         }
     }
 
-    static void unserialize(const hdf5_type* vec_align,
+    static void unserialize(const hdf5_type*           vec_align,
                             const std::vector<size_t>& dims,
-                            type& val) {
+                            type&                      val) {
         std::vector<size_t> next_dims(dims.begin() + 1, dims.end());
-        size_t next_size = compute_total_size(next_dims);
+        size_t              next_size = compute_total_size(next_dims);
         for (size_t i = 0; i < dims[0]; ++i) {
             inspector<value_type>::unserialize(vec_align + i * next_size, next_dims, *val.getMemory(i));
         }
@@ -68,19 +73,19 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
 
 template <typename T>
 struct inspector<dnegri::jiarray::JIVector<T>> {
-    using type = dnegri::jiarray::JIVector<T>;
+    using type       = dnegri::jiarray::JIVector<T>;
     using value_type = unqualified_t<T>;
-    using base_type = typename inspector<value_type>::base_type;
-    using hdf5_type = typename inspector<value_type>::hdf5_type;
+    using base_type  = typename inspector<value_type>::base_type;
+    using hdf5_type  = typename inspector<value_type>::hdf5_type;
 
-    static constexpr size_t ndim = 1;
-    static constexpr size_t recursive_ndim = ndim;
-    static constexpr bool is_trivially_copyable = std::is_trivially_copyable<value_type>::value &&
+    static constexpr size_t ndim                  = 1;
+    static constexpr size_t recursive_ndim        = ndim;
+    static constexpr bool   is_trivially_copyable = std::is_trivially_copyable<value_type>::value &&
                                                   inspector<value_type>::is_trivially_copyable;
 
     static std::vector<size_t> getDimensions(const type& val) {
         std::vector<size_t> sizes;
-        sizes.push_back(val.size());        
+        sizes.push_back(val.size());
         return sizes;
     }
 
@@ -93,11 +98,7 @@ struct inspector<dnegri::jiarray::JIVector<T>> {
     }
 
     static void prepare(type& val, const std::vector<size_t>& dims) {
-        // val.setSize(dims);
-        // std::vector<size_t> next_dims(dims.begin() + 1, dims.end());
-        // for (auto&& e: val) {
-        //     inspector<value_type>::prepare(e, next_dims);
-        // }
+        val.resize(dims[0]);
     }
 
     static hdf5_type* data(type& val) {
@@ -116,11 +117,11 @@ struct inspector<dnegri::jiarray::JIVector<T>> {
         }
     }
 
-    static void unserialize(const hdf5_type* vec_align,
+    static void unserialize(const hdf5_type*           vec_align,
                             const std::vector<size_t>& dims,
-                            type& val) {
+                            type&                      val) {
         std::vector<size_t> next_dims(dims.begin() + 1, dims.end());
-        size_t next_size = compute_total_size(next_dims);
+        size_t              next_size = compute_total_size(next_dims);
         for (size_t i = 0; i < dims[0]; ++i) {
             inspector<value_type>::unserialize(vec_align + i * next_size, next_dims, *val.getMemory(i));
         }
