@@ -2,6 +2,7 @@
 
 #include "pch.h"
 #include "FastArray.h"
+#include <vector>
 
 namespace dnegri::jiarray {
     

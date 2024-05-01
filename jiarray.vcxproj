@@ -19,7 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\FastArray.h" />
+    <ClInclude Include="src\HighFiveExtension.hpp" />
     <ClInclude Include="src\JIArray.h" />
+    <ClInclude Include="src\JIVector.h" />
+    <ClInclude Include="src\pch.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
