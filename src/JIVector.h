@@ -30,6 +30,14 @@ public:
         return vec_impl.front();
     }
 
+    reference back() {
+        return vec_impl.back();
+    }
+
+    const_reference back() const {
+        return vec_impl.back();
+    }
+
     reference operator[](int index) {
         return vec_impl[index - JIARRAY_OFFSET];
     }
@@ -44,6 +52,14 @@ public:
 
     const_reference at(int index) const {
         return vec_impl.at(index - JIARRAY_OFFSET);
+    }
+
+    _Tp* getMemory(int index) {
+        return &vec_impl.at(index);
+    }
+
+    _Tp* get_pointer() {
+        return vec_impl.data();
     }
 
     reference operator()(int index) {
@@ -74,9 +90,14 @@ public:
         return vec_impl;
     }
 
+    _Tp* data() {
+        return vec_impl.data();
+    }
+
     const _Tp* data() const {
         return vec_impl.data();
     }
+
 
     void operator=(const JIArray<_Tp, 1>& other) {
         ffor(i, 1, other.size()) {
@@ -94,4 +115,5 @@ using zvector = JIVector<T>;
 using zstrings = JIVector<std::string>;
 using zdoubles = JIVector<double>;
 using zfloats = JIVector<float>;
+using zints = JIVector<int>;
 }; // namespace dnegri::jiarray
