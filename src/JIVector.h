@@ -22,6 +22,10 @@ public:
         vec_impl = il;
     }
 
+    JIVector(const std::vector<_Tp>& vec) {
+        vec_impl = vec;
+    }
+
     reference front() {
         return vec_impl.front();
     }
@@ -103,6 +107,10 @@ public:
         ffor(i, 1, other.size()) {
             this->push_back(other(i));
         }
+    }
+
+    void operator=(const std::vector<_Tp>& other) {
+        vec_impl = other;
     }
 
     const bool contains(const _Tp& value) const {

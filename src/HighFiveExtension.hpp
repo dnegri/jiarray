@@ -18,14 +18,16 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
                                                   inspector<value_type>::is_trivially_copyable;
 
     static std::vector<size_t> getDimensions(const type& val) {
-        std::vector<size_t> sizes;
+        std::vector<size_t> sizes(ndim);
 
         int prev_size = val.rankSize[0];
         for (size_t i = 1; i < N; ++i) {
-            sizes.push_back(val.rankSize[i] / prev_size);
-            prev_size = val.rankSize[i];
+            auto dim     = val.rankSize[i] / prev_size;
+            sizes[N - i] = dim;
+            prev_size    = val.rankSize[i];
         }
-        sizes.push_back(val.size() / prev_size);
+        sizes[0] = (val.size() / prev_size);
+
         return sizes;
     }
 
