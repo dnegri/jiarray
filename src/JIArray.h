@@ -1259,7 +1259,7 @@ public:
         JIARRAY_CHECK_SIZE(n_data, array.n_data);
 
         for (int i = 0; i < n_data; ++i) {
-            this->memory[i] = this->memory[i] / array.memory[i];
+            this->memory[i] /= array.memory[i];
         }
         return *this;
     }
@@ -1618,6 +1618,14 @@ public:
 #define string4 JIArray<string, 4>
 #define string5 JIArray<string, 5>
 
-#define ffor(i, begin, end)      for (int i = begin; i <= end; ++i)
-#define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+#if JIARRAY_OFFSET == 0
+    #define ffor(i, begin, end)      for (int i = begin; i < end; ++i)
+    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+#else
+    #define ffor(i, begin, end)      for (int i = begin; i <= end; ++i)
+    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+#endif
+
+#define zfor(i, end) ffor(i, JIARRAY_OFFSET, end)
+
 } // namespace dnegri::jiarray
