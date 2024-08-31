@@ -336,7 +336,7 @@ public:
         allocated = JIARRAY_ALLOCATED_NONE;
         sumOfOffset = array.sumOfOffset;
 #ifdef JIARRAY_DEBUG
-        for (int i = 0; i < RANK; i++)
+        for (auto i = 0; i < RANK; i++)
             sizeOfRank[i] = array.sizeOfRank[i];
 #endif
     }
@@ -1619,11 +1619,11 @@ public:
 #define string5 JIArray<string, 5>
 
 #if JIARRAY_OFFSET == 0
-    #define ffor(i, begin, end)      for (int i = begin; i < end; ++i)
-    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+    #define ffor(i, begin, end)      for (size_t i = begin; i < end; ++i)
+    #define ffor_back(i, begin, end) for (size_t i = begin; i >= end; --i)
 #else
-    #define ffor(i, begin, end)      for (int i = begin; i <= end; ++i)
-    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+    #define ffor(i, begin, end)      for (size_t i = begin; i <= end; ++i)
+    #define ffor_back(i, begin, end) for (size_t i = begin; i >= end; --i)
 #endif
 
 #define zfor(i, end) ffor(i, JIARRAY_OFFSET, end)

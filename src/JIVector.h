@@ -113,7 +113,7 @@ public:
         vec_impl = other;
     }
 
-    const bool contains(const _Tp& value) const {
+    bool contains(const _Tp& value) const {
         return std::find(vec_impl.begin(), vec_impl.end(), value) != vec_impl.end();
     }
 };
