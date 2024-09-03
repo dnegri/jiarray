@@ -116,6 +116,23 @@ public:
     bool contains(const _Tp& value) const {
         return std::find(vec_impl.begin(), vec_impl.end(), value) != vec_impl.end();
     }
+
+    void insert(const_iterator iter, std::initializer_list<_Tp> il) {
+        vec_impl.insert(iter, il);
+    }
+
+    void insert(const_iterator iter, const JIVector<_Tp>& other) {
+        vec_impl.insert(iter, other.begin(), other.end());
+    }
+
+    void insert(const_iterator iter, const JIArray<_Tp, 1>& other) {
+        vec_impl.insert(iter, other.begin(), other.end());
+    }
+
+    void insert(const_iterator iter, const std::vector<_Tp>& other) {
+        vec_impl.insert(iter, other.begin(), other.end());
+    }
+
 };
 template <typename T>
 using zvector = JIVector<T>;
