@@ -1,21 +1,21 @@
 #pragma once
 
-#include "pch.h"
 #include "FastArray.h"
+#include "pch.h"
 #include <vector>
 
 namespace dnegri::jiarray {
-    
+
 template <class T, std::size_t RANK, class = std::make_index_sequence<RANK>>
 class JIArray;
 
 template <class T, std::size_t RANK, std::size_t... INTS>
 class JIArray<T, RANK, std::index_sequence<INTS...>> {
 private:
-    int n_data      = 0;
+    int n_data = 0;
 
 public:
-    T*  memory    = nullptr;
+    T*  mm    = nullptr;
     int allocated = JIARRAY_ALLOCATED_NONE;
     int rankSize[RANK]{};
     int offset[RANK]{};
@@ -34,7 +34,7 @@ private:
 private:
     void init(int i) {
         n_data = i;
-        memory = new T[n_data]{};
+        mm = new T[n_data]{};
         for (int ioffset = 0; ioffset < 1; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -47,7 +47,7 @@ private:
 
     void init(int i, int j) {
         n_data = i * j;
-        memory = new T[n_data]{};
+        mm = new T[n_data]{};
         for (int ioffset = 0; ioffset < 2; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -62,7 +62,7 @@ private:
 
     void init(int i, int j, int k) {
         n_data = i * j * k;
-        memory = new T[n_data]{};
+        mm = new T[n_data]{};
         for (int ioffset = 0; ioffset < 3; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -79,7 +79,7 @@ private:
 
     void init(int i, int j, int k, int l) {
         n_data = i * j * k * l;
-        memory = new T[n_data]{};
+        mm = new T[n_data]{};
         for (int ioffset = 0; ioffset < 4; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -98,7 +98,7 @@ private:
 
     void init(int i, int j, int k, int l, int m) {
         n_data = i * j * k * l * m;
-        memory = new T[n_data]{};
+        mm = new T[n_data]{};
         for (int ioffset = 0; ioffset < 5; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -120,7 +120,7 @@ private:
 
     void init(int i, int j, int k, int l, int m, int n) {
         n_data = i * j * k * l * m * n;
-        memory = new T[n_data]{};
+        mm = new T[n_data]{};
         for (int ioffset = 0; ioffset < 6; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -142,8 +142,8 @@ private:
 #endif
     };
     void init(int i, T* memory_) {
-        n_data   = i;
-        memory = memory_;
+        n_data = i;
+        mm = memory_;
         for (int ioffset = 0; ioffset < 1; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -155,8 +155,8 @@ private:
     };
 
     void init(int i, int j, T* memory_) {
-        n_data   = i * j;
-        memory = memory_;
+        n_data = i * j;
+        mm = memory_;
         for (int ioffset = 0; ioffset < 2; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -170,8 +170,8 @@ private:
     };
 
     void init(int i, int j, int k, T* memory_) {
-        n_data   = i * j * k;
-        memory = memory_;
+        n_data = i * j * k;
+        mm = memory_;
         for (int ioffset = 0; ioffset < 3; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -187,8 +187,8 @@ private:
     };
 
     void init(int i, int j, int k, int l, T* memory_) {
-        n_data   = i * j * k * l;
-        memory = memory_;
+        n_data = i * j * k * l;
+        mm = memory_;
         for (int ioffset = 0; ioffset < 4; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -206,8 +206,8 @@ private:
     };
 
     void init(int i, int j, int k, int l, int m, T* memory_) {
-        n_data   = i * j * k * l * m;
-        memory = memory_;
+        n_data = i * j * k * l * m;
+        mm = memory_;
         for (int ioffset = 0; ioffset < 5; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -228,8 +228,8 @@ private:
     };
 
     void init(int i, int j, int k, int l, int m, int n, T* memory_) {
-        n_data   = i * j * k * l * m * n;
-        memory = memory_;
+        n_data = i * j * k * l * m * n;
+        mm = memory_;
         for (int ioffset = 0; ioffset < 6; ioffset++)
             offset[ioffset] = JIARRAY_OFFSET;
         rankSize[0] = 1;
@@ -301,12 +301,12 @@ private:
 public:
     void destroy() {
         if (allocated != JIARRAY_ALLOCATED_NONE) {
-            if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && memory != nullptr) {
-                delete[] memory;
+            if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && mm != nullptr) {
+                delete[] mm;
             }
-            memory    = nullptr;
+            mm    = nullptr;
             allocated = JIARRAY_ALLOCATED_NONE;
-            n_data      = 0;
+            n_data    = 0;
         }
     }
 
@@ -323,17 +323,17 @@ public:
     JIArray() {
     }
 
-    JIArray(std::initializer_list<T> il) : JIArray(il.size()) {
-        std::copy(il.begin(), il.end(), memory);
+    JIArray(std::initializer_list<T> il)
+        : JIArray(il.size()) {
+        std::copy(il.begin(), il.end(), mm);
     }
 
-
     JIArray(const JIArray<T, RANK>& array) {
-        n_data   = array.n_data;
-        memory = array.memory;
+        n_data = array.n_data;
+        mm = array.mm;
         std::copy((int*)array.rankSize, ((int*)array.rankSize) + RANK, rankSize);
         std::copy((int*)array.offset, ((int*)array.offset) + RANK, offset);
-        allocated = JIARRAY_ALLOCATED_NONE;
+        allocated   = JIARRAY_ALLOCATED_NONE;
         sumOfOffset = array.sumOfOffset;
 #ifdef JIARRAY_DEBUG
         for (auto i = 0; i < RANK; i++)
@@ -354,7 +354,7 @@ public:
     };
 
     JIArray(T* memory_)
-        : memory(memory_) {
+        : mm(memory_) {
     }
 
     JIArray(const int& size_, int* rankSize_, int* offset_, const int& sumOfOffset_, T* memory_
@@ -368,7 +368,7 @@ public:
         n_data = size_;
         std::copy(rankSize_, rankSize_ + RANK, rankSize);
         std::copy(offset_, offset_ + RANK, offset);
-        memory      = memory_;
+        mm      = memory_;
         sumOfOffset = sumOfOffset_;
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
@@ -378,24 +378,24 @@ public:
 
     //    JIArray(int l, int m, JIArray<T,RANK>* a) {
     //        size = this->rankSize[RANK_2];
-    //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l;
+    //        mm = this->mm + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l;
     //    };
     //
     //    JIArray(int k, int l, int m, JIArray* a) {
     //        size = this->rankSize[RANK_3];
-    //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] *
+    //        mm = this->mm + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] *
     //        k;
     //    };
     //
     //    JIArray(int j, int k, int l, int m, JIArray* a) {
     //        size = this->rankSize[RANK_4];
-    //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] *
+    //        mm = this->mm + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] *
     //        k + this->rankSize[RANK_4] * j;
     //    };
     //
     //    JIArray(int i, int j, int k, int l, int m, JIArray* a) {
     //        size = this->rankSize[RANK_5];
-    //        memory = this->memory + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] *
+    //        mm = this->mm + this->rankSize[RANK_1] * m + this->rankSize[RANK_2] * l + this->rankSize[RANK_3] *
     //        k + this->rankSize[RANK_4] * j +
     //                 this->rankSize[RANK_5] * i;
     //    }
@@ -420,7 +420,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
         auto array = JIArray<T, RANK2>(this->rankSize[RANK_1], this->rankSize, this->offset, sumOfOffset, p_memory
@@ -441,13 +441,13 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
         auto array = JIArray<T, RANK2>(
             this->rankSize[RANK_2], this->rankSize, this->offset, sumOfOffset,
-            this->memory + this->rankSize[RANK_1] * (m - offset[RANK_1]) + this->rankSize[RANK_2] * (l - offset[RANK_2])
+            this->mm + this->rankSize[RANK_1] * (m - offset[RANK_1]) + this->rankSize[RANK_2] * (l - offset[RANK_2])
 #ifdef JIARRAY_DEBUG
                 ,
             this->sizeOfRank
@@ -466,7 +466,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
@@ -491,7 +491,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_4] * (j - offset[RANK_4]);
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
@@ -518,7 +518,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_5] * (i - offset[RANK_5]);
         p_memory += this->rankSize[RANK_4] * (j - offset[RANK_4]);
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
@@ -544,7 +544,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
         auto array = JIArray<T, RANK2>(this_noconst->rankSize[RANK_1], this_noconst->rankSize, this_noconst->offset,
@@ -568,7 +568,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
 
@@ -594,7 +594,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
         p_memory += this->rankSize[RANK_1] * (m - offset[RANK_1]);
@@ -622,7 +622,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_4] * (j - offset[RANK_4]);
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
         p_memory += this->rankSize[RANK_2] * (l - offset[RANK_2]);
@@ -652,7 +652,7 @@ public:
         for (int irank = 1; irank < RANK2; irank++)
             sumOfOffset += this->rankSize[irank] * this->offset[irank];
 
-        auto* p_memory = memory;
+        auto* p_memory = mm;
         p_memory += this->rankSize[RANK_5] * (i - offset[RANK_5]);
         p_memory += this->rankSize[RANK_4] * (j - offset[RANK_4]);
         p_memory += this->rankSize[RANK_3] * (k - offset[RANK_3]);
@@ -670,32 +670,32 @@ public:
     }
 
     inline T* getMemory(int idx = 0) {
-        return memory + idx;
+        return mm + idx;
     }
 
     inline const T* getMemory(int idx = 0) const {
-        return memory + idx;
+        return mm + idx;
     }
 
     inline T* data() {
-        return memory;
+        return mm;
     }
 
     inline const T* data() const {
-        return memory;
+        return mm;
     }
 
     inline T* data(int m) {
         JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[RANK_1]);
+        return this->mm + this->rankSize[RANK_1] * (m - offset[RANK_1]);
     }
 
     inline T* data(int l, int m) {
         JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
         JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]);
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]);
     }
 
     inline T* data(int k, int l, int m) {
@@ -703,7 +703,7 @@ public:
         JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
         JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]);
     }
 
@@ -713,7 +713,7 @@ public:
         JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
         JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) + this->rankSize[RANK_4] * (j - offset[4]);
     }
 
@@ -724,7 +724,7 @@ public:
         JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
         JIARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) + this->rankSize[RANK_4] * (j - offset[4]) +
                this->rankSize[RANK_5] * (i - offset[5]);
     }
@@ -732,14 +732,14 @@ public:
     inline T* data(int m) const {
         JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[RANK_1]);
+        return this->mm + this->rankSize[RANK_1] * (m - offset[RANK_1]);
     }
 
     inline T* data(int l, int m) const {
         JIARRAY_CHECK_BOUND(m, offset[RANK_1], offset[RANK_1] + sizeOfRank[RANK_1] - 1);
         JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]);
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]);
     }
 
     inline T* data(int k, int l, int m) const {
@@ -747,7 +747,7 @@ public:
         JIARRAY_CHECK_BOUND(l, offset[RANK_2], offset[RANK_2] + sizeOfRank[RANK_2] - 1);
         JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]);
     }
 
@@ -757,7 +757,7 @@ public:
         JIARRAY_CHECK_BOUND(k, offset[RANK_3], offset[RANK_3] + sizeOfRank[RANK_3] - 1);
         JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) + this->rankSize[RANK_4] * (j - offset[4]);
     }
 
@@ -768,7 +768,7 @@ public:
         JIARRAY_CHECK_BOUND(j, offset[RANK_4], offset[RANK_4] + sizeOfRank[RANK_4] - 1);
         JIARRAY_CHECK_BOUND(i, offset[RANK_5], offset[RANK_5] + sizeOfRank[RANK_5] - 1);
 
-        return this->memory + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
+        return this->mm + this->rankSize[RANK_1] * (m - offset[1]) + this->rankSize[RANK_2] * (l - offset[2]) +
                this->rankSize[RANK_3] * (k - offset[3]) + this->rankSize[RANK_4] * (j - offset[4]) +
                this->rankSize[RANK_5] * (i - offset[5]);
     }
@@ -780,7 +780,7 @@ public:
     inline T average() const {
         T sum = 0.0;
         for (int i = 0; i < n_data; ++i) {
-            sum += memory[i];
+            sum += mm[i];
         }
         return sum / n_data;
     }
@@ -788,25 +788,25 @@ public:
     inline T sum() const {
         T sum = 0.0;
         for (int i = 0; i < n_data; ++i) {
-            sum += memory[i];
+            sum += mm[i];
         }
         return sum;
     }
 
     inline T max() const {
-        T mx = memory[0];
+        T mx = mm[0];
         for (int i = 1; i < n_data; ++i) {
-            if (memory[i] > mx)
-                mx = memory[i];
+            if (mm[i] > mx)
+                mx = mm[i];
         }
         return mx;
     }
 
     inline T min() const {
-        T mx = memory[0];
+        T mx = mm[0];
         for (int i = 1; i < n_data; ++i) {
-            if (memory[i] < mx)
-                mx = memory[i];
+            if (mm[i] < mx)
+                mx = mm[i];
         }
         return mx;
     }
@@ -832,14 +832,14 @@ public:
     inline T& operator()(int i) {
         JIARRAY_CHECK_RANK(RANK, 1);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        return memory[i - sumOfOffset];
+        return mm[i - sumOfOffset];
     }
 
     inline T& operator()(int i, int j) {
         JIARRAY_CHECK_RANK(RANK, 2);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        return memory[i + rankSize[1] * j - sumOfOffset];
+        return mm[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline T& operator()(int i, int j, int k) {
@@ -847,7 +847,7 @@ public:
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline T& operator()(int i, int j, int k, int l) {
@@ -856,7 +856,7 @@ public:
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline T& operator()(int i, int j, int k, int l, int m) {
@@ -866,7 +866,7 @@ public:
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
     inline T& operator()(int i, int j, int k, int l, int m, int n) {
@@ -877,7 +877,7 @@ public:
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
         JIARRAY_CHECK_BOUND(n, offset[5], offset[5] + sizeOfRank[5] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m + rankSize[5] * n - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m + rankSize[5] * n - sumOfOffset];
     }
 
     inline T& operator()(const FastArray<int, RANK>& idx) {
@@ -888,7 +888,7 @@ public:
             pos += rankSize[i] * idx(i + 1);
         }
 
-        return memory[pos];
+        return mm[pos];
     }
 
     inline const T& operator()(const FastArray<int, RANK>& idx) const {
@@ -899,20 +899,20 @@ public:
             pos += rankSize[i] * idx(i + 1);
         }
 
-        return memory[pos];
+        return mm[pos];
     }
 
     inline const T& operator()(int i) const {
         JIARRAY_CHECK_RANK(RANK, 1);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        return memory[i - sumOfOffset];
+        return mm[i - sumOfOffset];
     }
 
     inline const T& operator()(int i, int j) const {
         JIARRAY_CHECK_RANK(RANK, 2);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        return memory[i + rankSize[1] * j - sumOfOffset];
+        return mm[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline const T& operator()(int i, int j, int k) const {
@@ -920,7 +920,7 @@ public:
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline const T& operator()(int i, int j, int k, int l) const {
@@ -929,7 +929,7 @@ public:
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline const T& operator()(int i, int j, int k, int l, int m) const {
@@ -939,20 +939,20 @@ public:
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
     inline const T& at(int i) const {
         JIARRAY_CHECK_RANK(RANK, 1);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        return memory[i - sumOfOffset];
+        return mm[i - sumOfOffset];
     }
 
     inline const T& at(int i, int j) const {
         JIARRAY_CHECK_RANK(RANK, 2);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        return memory[i + rankSize[1] * j - sumOfOffset];
+        return mm[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline const T& at(int i, int j, int k) const {
@@ -960,7 +960,7 @@ public:
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline const T& at(int i, int j, int k, int l) const {
@@ -969,7 +969,7 @@ public:
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline const T& at(int i, int j, int k, int l, int m) const {
@@ -979,20 +979,20 @@ public:
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
     inline T& at(int i) {
         JIARRAY_CHECK_RANK(RANK, 1);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
-        return memory[i - sumOfOffset];
+        return mm[i - sumOfOffset];
     }
 
     inline T& at(int i, int j) {
         JIARRAY_CHECK_RANK(RANK, 2);
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
-        return memory[i + rankSize[1] * j - sumOfOffset];
+        return mm[i + rankSize[1] * j - sumOfOffset];
     }
 
     inline T& at(int i, int j, int k) {
@@ -1000,7 +1000,7 @@ public:
         JIARRAY_CHECK_BOUND(i, offset[0], offset[0] + sizeOfRank[0] - 1);
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k - sumOfOffset];
     }
 
     inline T& at(int i, int j, int k, int l) {
@@ -1009,7 +1009,7 @@ public:
         JIARRAY_CHECK_BOUND(j, offset[1], offset[1] + sizeOfRank[1] - 1);
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l - sumOfOffset];
     }
 
     inline T& at(int i, int j, int k, int l, int m) {
@@ -1019,23 +1019,23 @@ public:
         JIARRAY_CHECK_BOUND(k, offset[2], offset[2] + sizeOfRank[2] - 1);
         JIARRAY_CHECK_BOUND(l, offset[3], offset[3] + sizeOfRank[3] - 1);
         JIARRAY_CHECK_BOUND(m, offset[4], offset[4] + sizeOfRank[4] - 1);
-        return memory[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
+        return mm[i + rankSize[1] * j + rankSize[2] * k + rankSize[3] * l + rankSize[4] * m - sumOfOffset];
     }
 
     inline JIArray<T, RANK>& operator=(const std::initializer_list<T>& list) {
         JIARRAY_CHECK_SIZE(this->n_data, list.size());
         int idx = 0;
         for (const T& val : list) {
-            memory[idx++] = val;
+            mm[idx++] = val;
         }
         return *this;
     }
 
     inline JIArray<T, RANK>& operator=(const T& val) {
-        assert(memory != nullptr);
+        assert(mm != nullptr);
 
         for (int i = 0; i < n_data; ++i) {
-            memory[i] = val;
+            mm[i] = val;
         }
 
         return *this;
@@ -1043,26 +1043,26 @@ public:
 
     inline JIArray<T, RANK>& operator=(const std::vector<T>& val) {
         JIARRAY_CHECK_SIZE(n_data, val.size());
-        
+
         for (int i = 0; i < n_data; ++i) {
-            memory[i] = val[i];
+            mm[i] = val[i];
         }
 
         return *this;
     }
 
     inline JIArray<T, RANK>& operator=(const T* array) {
-        assert(memory != nullptr);
+        assert(mm != nullptr);
 
         for (int i = 0; i < n_data; ++i) {
-            memory[i] = array[i];
+            mm[i] = array[i];
         }
 
         return *this;
     }
 
     inline JIArray<T, RANK>& operator=(const JIArray<T, RANK>& array) {
-        if (allocated == JIARRAY_ALLOCATED_NONE && memory == nullptr) {
+        if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
             n_data = array.getSize();
 
             auto arrayRankSize = array.getRankSize();
@@ -1072,10 +1072,10 @@ public:
                 offset[i]   = arrayOffset[i];
             }
 
-            memory           = new T[n_data];
+            mm           = new T[n_data];
             auto arrayMemory = array.data();
             for (int i = 0; i < n_data; ++i) {
-                memory[i] = arrayMemory[i];
+                mm[i] = arrayMemory[i];
             }
 
             sumOfOffset = array.sumOfOffset;
@@ -1102,7 +1102,7 @@ public:
 #endif
             auto arrayMemory = array.data();
             for (int i = 0; i < n_data; ++i) {
-                memory[i] = arrayMemory[i];
+                mm[i] = arrayMemory[i];
             }
             return *this;
         }
@@ -1113,7 +1113,7 @@ public:
             return false;
 
         for (int i = 0; i < n_data; ++i) {
-            if (array.memory[i] != this->memory[i])
+            if (array.mm[i] != this->mm[i])
                 return false;
         }
 
@@ -1122,7 +1122,7 @@ public:
 
     inline JIArray<T, RANK>& operator+=(const T& val) {
         for (int i = 0; i < n_data; ++i) {
-            this->memory[i] += val;
+            this->mm[i] += val;
         }
         return *this;
     }
@@ -1131,7 +1131,7 @@ public:
         JIARRAY_CHECK_SIZE(n_data, array.n_data);
 
         for (int i = 0; i < n_data; ++i) {
-            this->memory[i] += array.memory[i];
+            this->mm[i] += array.mm[i];
         }
         return *this;
     }
@@ -1141,7 +1141,7 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] + array.memory[i];
+            out.mm[i] = this->mm[i] + array.mm[i];
         }
         return out;
     }
@@ -1151,7 +1151,7 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] + array.memory[i];
+            out.mm[i] = this->mm[i] + array.mm[i];
         }
         return out;
     }
@@ -1159,7 +1159,7 @@ public:
     inline JIArray<T, RANK>& operator-=(const JIArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(n_data, array.n_data);
         for (int i = 0; i < n_data; ++i) {
-            memory[i] -= array.memory[i];
+            mm[i] -= array.mm[i];
         }
         return *this;
     }
@@ -1169,7 +1169,7 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] - array.memory[i];
+            out.mm[i] = this->mm[i] - array.mm[i];
         }
         return out;
     }
@@ -1178,7 +1178,7 @@ public:
         JIArray<T, RANK> out;
         out = array;
         for (int i = 0; i < out.n_data; ++i) {
-            out.memory[i] = -out.memory[i];
+            out.mm[i] = -out.mm[i];
         }
         return out;
     }
@@ -1188,7 +1188,7 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] - array.memory[i];
+            out.mm[i] = this->mm[i] - array.mm[i];
         }
         return out;
     }
@@ -1198,7 +1198,7 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] * array.memory[i];
+            out.mm[i] = this->mm[i] * array.mm[i];
         }
         return out;
     }
@@ -1207,14 +1207,14 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] * val;
+            out.mm[i] = this->mm[i] * val;
         }
         return out;
     }
 
     inline JIArray<T, RANK>& operator*=(const T& val) {
         for (int i = 0; i < n_data; ++i) {
-            this->memory[i] *= val;
+            this->mm[i] *= val;
         }
         return *this;
     }
@@ -1223,7 +1223,7 @@ public:
         JIARRAY_CHECK_SIZE(n_data, array.n_data);
 
         for (int i = 0; i < n_data; ++i) {
-            this->memory[i] *= array.memory[i];
+            this->mm[i] *= array.mm[i];
         }
         return *this;
     }
@@ -1231,14 +1231,14 @@ public:
     inline JIArray<T, RANK> operator*(const JIArray<T, RANK>& array) const {
         JIArray<T, RANK> sum;
 
-        sum.n_data      = array.n_data;
-        sum.memory    = new T[sum.n_data];
+        sum.n_data    = array.n_data;
+        sum.mm    = new T[sum.n_data];
         sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < n_data; ++i) {
-            sum.memory[i] = this->memory[i] * array.memory[i];
+            sum.mm[i] = this->mm[i] * array.mm[i];
         }
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
@@ -1251,7 +1251,7 @@ public:
     inline void operator/=(const T& val) {
         auto rval = 1.0 / val;
         for (int i = 0; i < n_data; ++i) {
-            memory[i] *= rval;
+            mm[i] *= rval;
         }
     }
 
@@ -1259,7 +1259,7 @@ public:
         JIARRAY_CHECK_SIZE(n_data, array.n_data);
 
         for (int i = 0; i < n_data; ++i) {
-            this->memory[i] /= array.memory[i];
+            this->mm[i] /= array.mm[i];
         }
         return *this;
     }
@@ -1269,17 +1269,16 @@ public:
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] / array.memory[i];
+            out.mm[i] = this->mm[i] / array.mm[i];
         }
         return out;
     }
-
 
     inline JIArray<T, RANK> operator/(const T& val) {
         JIArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < n_data; ++i) {
-            out.memory[i] = this->memory[i] / val;
+            out.mm[i] = this->mm[i] / val;
         }
         return out;
     }
@@ -1287,7 +1286,7 @@ public:
     inline double sqsum() const {
         double sum = 0;
         for (int i = 0; i < n_data; ++i) {
-            sum += memory[i] * memory[i];
+            sum += mm[i] * mm[i];
         }
 
         return sum;
@@ -1302,14 +1301,14 @@ public:
     inline JIArray<T, RANK> friend operator+(const T& val, const JIArray<T, RANK>& array) {
         JIArray<T, RANK> sum;
 
-        sum.n_data      = array.n_data;
-        sum.memory    = new T[sum.n_data];
+        sum.n_data    = array.n_data;
+        sum.mm    = new T[sum.n_data];
         sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < sum.n_data; ++i) {
-            sum.memory[i] = val + array.memory[i];
+            sum.mm[i] = val + array.mm[i];
         }
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
@@ -1322,14 +1321,14 @@ public:
     inline JIArray<T, RANK> friend operator*(const T& val, const JIArray<T, RANK>& array) {
         JIArray<T, RANK> sum;
 
-        sum.n_data      = array.n_data;
-        sum.memory    = new T[sum.n_data];
+        sum.n_data    = array.n_data;
+        sum.mm    = new T[sum.n_data];
         sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < sum.n_data; ++i) {
-            sum.memory[i] = val * array.memory[i];
+            sum.mm[i] = val * array.mm[i];
         }
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
@@ -1342,14 +1341,14 @@ public:
     inline JIArray<T, RANK> friend operator/(const T& val, const JIArray<T, RANK>& array) {
         JIArray<T, RANK> sum;
 
-        sum.n_data      = array.n_data;
-        sum.memory    = new T[sum.n_data];
+        sum.n_data    = array.n_data;
+        sum.mm    = new T[sum.n_data];
         sum.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, sum.rankSize);
         std::copy(array.offset, array.offset + RANK, sum.offset);
         for (int i = 0; i < sum.n_data; ++i) {
-            sum.memory[i] = val / array.memory[i];
+            sum.mm[i] = val / array.mm[i];
         }
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
@@ -1370,14 +1369,14 @@ public:
 
         T sum = 0.0;
         for (int i = 0; i < array1.n_data; ++i) {
-            sum += array1.memory[i] * array2.memory[i];
+            sum += array1.mm[i] * array2.mm[i];
         }
         return sum;
     }
 
     inline bool contains(const T& item) const {
         for (int i = 0; i < n_data; ++i) {
-            if (memory[i] == item)
+            if (mm[i] == item)
                 return true;
         }
         return false;
@@ -1387,9 +1386,9 @@ public:
         int loc = -1;
         T   value;
         for (int i = 0; i < this->n_data; ++i) {
-            if (memory[i] == item) {
+            if (mm[i] == item) {
                 loc   = i;
-                value = memory[i];
+                value = mm[i];
                 break;
             }
         }
@@ -1401,13 +1400,13 @@ public:
             return location;
 
         for (int rank = RANK - 1; rank > 0; --rank) {
-            location.memory[rank] = loc / rankSize[rank];
-            loc -= (location.memory[rank]) * rankSize[rank];
+            location.mm[rank] = loc / rankSize[rank];
+            loc -= (location.mm[rank]) * rankSize[rank];
         }
-        location.memory[0] = loc;
+        location.mm[0] = loc;
 
         for (int rank = 0; rank < RANK; ++rank) {
-            location.memory[rank] += offset[rank];
+            location.mm[rank] += offset[rank];
         }
 
         return location;
@@ -1415,11 +1414,11 @@ public:
 
     inline FastArray<int, RANK> maxloc() {
         int maxloc = 0;
-        T   maxval = memory[0];
+        T   maxval = mm[0];
         for (int i = 1; i < this->n_data; ++i) {
-            if (memory[i] > maxval) {
+            if (mm[i] > maxval) {
                 maxloc = i;
-                maxval = memory[i];
+                maxval = mm[i];
             }
         }
 
@@ -1440,11 +1439,11 @@ public:
 
     inline FastArray<int, RANK> maxloc(int from, int to) {
         int maxloc = 0;
-        T   maxval = memory[from - JIARRAY_OFFSET];
+        T   maxval = mm[from - JIARRAY_OFFSET];
         for (int i = from - JIARRAY_OFFSET + 1; i < to - JIARRAY_OFFSET; ++i) {
-            if (memory[i] > maxval) {
+            if (mm[i] > maxval) {
                 maxloc = i;
-                maxval = memory[i];
+                maxval = mm[i];
             }
         }
 
@@ -1461,11 +1460,11 @@ public:
     inline void shareWith(const JIArray<T, RANK>& array) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
-        n_data   = array.n_data;
-        memory = array.memory;
+        n_data = array.n_data;
+        mm = array.mm;
         std::copy((int*)array.rankSize, ((int*)array.rankSize) + RANK, rankSize);
         std::copy((int*)array.offset, ((int*)array.offset) + RANK, offset);
-        allocated = JIARRAY_ALLOCATED_NONE;
+        allocated   = JIARRAY_ALLOCATED_NONE;
         sumOfOffset = array.sumOfOffset;
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK; i++)
@@ -1481,7 +1480,7 @@ public:
         using reference         = T&; // or also value_type&
 
         Iterator(pointer ptr)
-            : m_ptr(ptr){};
+            : m_ptr(ptr) {};
 
         reference operator*() {
             return *m_ptr;
@@ -1532,23 +1531,22 @@ public:
 
 public:
     Iterator begin() {
-        return Iterator(memory);
+        return Iterator(mm);
     };
     Iterator end() {
-        return Iterator(memory + n_data);
+        return Iterator(mm + n_data);
     }; // 200 is out of bounds
 
     const Iterator begin() const {
-        return Iterator(memory);
+        return Iterator(mm);
     };
     const Iterator end() const {
-        return Iterator(memory + n_data);
+        return Iterator(mm + n_data);
     }; // 200 is out of bounds
-
 
 public:
     std::vector<T> convertToVector() {
-        std::vector<T> vec(memory, memory + n_data);
+        std::vector<T> vec(mm, mm + n_data);
         return vec;
     }
 };

@@ -160,17 +160,6 @@ public:
     }
 };
 
-#define fbool(i)   FastArray<bool, i>
-#define fint(i)    FastArray<int, i>
-#define ffloat(i)  FastArray<float, i>
-#define fdouble(i) FastArray<double, i>
-#define fstring(i) StringFastArray<i>
-
-#define fbool2(i, j)   FastArray<bool, i, j>
-#define fint2(i, j)    FastArray<int, i, j>
-#define ffloat2(i, j)  FastArray<float, i, j>
-#define fdouble2(i, j) FastArray<double, i, j>
-
 template <int I>
 using bool1d = dnegri::jiarray::FastArray<bool, I>;
 
