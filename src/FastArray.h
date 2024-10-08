@@ -45,6 +45,23 @@ public:
         return pos;
     }
 
+    inline T min() const {
+        T mx = memory[0];
+        for (int i = 1; i < SIZE; ++i) {
+            if (memory[i] < mx) mx = memory[i];
+        }
+        return mx;
+    }
+
+    inline T max() const {
+        T mx = memory[0];
+        for (int i = 1; i < SIZE; ++i) {
+            if (memory[i] > mx) mx = memory[i];
+        }
+        return mx;
+    }
+
+
     inline T& operator()(int i) {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return memory[i - OFFSET];
@@ -186,5 +203,8 @@ using float2d = dnegri::jiarray::FastArray<float, I, J>;
 
 template <int I, int J>
 using double2d = dnegri::jiarray::FastArray<double, I, J>;
+
+template <class T, int I>
+using farray = dnegri::jiarray::FastArray<T, I>;
 
 } // namespace dnegri::jiarray
