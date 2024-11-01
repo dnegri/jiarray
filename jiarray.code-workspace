@@ -1,0 +1,45 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.f90": "FortranFreeForm",
+			"__bit_reference": "cpp",
+			"__hash_table": "cpp",
+			"__split_buffer": "cpp",
+			"__tree": "cpp",
+			"array": "cpp",
+			"deque": "cpp",
+			"forward_list": "cpp",
+			"initializer_list": "cpp",
+			"list": "cpp",
+			"map": "cpp",
+			"set": "cpp",
+			"span": "cpp",
+			"string": "cpp",
+			"string_view": "cpp",
+			"unordered_map": "cpp",
+			"unordered_set": "cpp",
+			"vector": "cpp",
+			"chrono": "cpp",
+			"format": "cpp",
+			"text_encoding": "cpp",
+			"concepts": "cpp",
+			"ios": "cpp",
+			"istream": "cpp",
+			"locale": "cpp",
+			"numeric": "cpp",
+			"ostream": "cpp",
+			"*.tcc": "cpp",
+			"fstream": "cpp",
+			"sstream": "cpp",
+			"algorithm": "cpp",
+			"bitset": "cpp",
+			"queue": "cpp",
+			"stack": "cpp"
+		}
+	}
+}

@@ -20,11 +20,13 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
     static std::vector<size_t> getDimensions(const type& val) {
         std::vector<size_t> sizes(ndim);
 
-        int prev_size = val.rankSize[0];
+        const int* rankSize = val.getRankSize();
+
+        int prev_size = rankSize[0];
         for (size_t i = 1; i < N; ++i) {
-            auto dim     = val.rankSize[i] / prev_size;
+            auto dim     = rankSize[i] / prev_size;
             sizes[N - i] = dim;
-            prev_size    = val.rankSize[i];
+            prev_size    = rankSize[i];
         }
         sizes[0] = (val.size() / prev_size);
 

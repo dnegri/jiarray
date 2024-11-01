@@ -2,3 +2,5 @@
 /x64/Debug
 *.user
 /x64
+build
+.DS_Store

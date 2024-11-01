@@ -1,0 +1,14 @@
+
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CMake Run",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+        }
+    ]
+}
