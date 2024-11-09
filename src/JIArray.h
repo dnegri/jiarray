@@ -129,10 +129,10 @@ public:
         allocated = JIARRAY_ALLOCATED_NONE;
 #ifdef JIARRAY_DEBUG
         for (int i = 0; i < RANK - 1; i++) {
-	    sizeOfRank[i] = 0;
+            sizeOfRank[i] = 0;
             if (rankSize[i] != 0) sizeOfRank[i] = rankSize[i + 1] / rankSize[i];
         }
-	sizeOfRank[RANK-1] = 0;
+        sizeOfRank[RANK - 1] = 0;
         if (rankSize[RANK - 1] != 0) sizeOfRank[RANK - 1] = size / rankSize[RANK - 1];
 #endif
     }
@@ -387,7 +387,6 @@ public:
     }
 
     inline JIArray<T, RANK>& operator=(const T& val) {
-        assert(mm != nullptr);
 
         for (int i = 0; i < nn; ++i) {
             mm[i] = val;
@@ -407,7 +406,6 @@ public:
     }
 
     inline JIArray<T, RANK>& operator=(const T* array) {
-        assert(mm != nullptr);
 
         for (int i = 0; i < nn; ++i) {
             mm[i] = array[i];
