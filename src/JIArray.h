@@ -128,11 +128,11 @@ public:
 
         allocated = JIARRAY_ALLOCATED_NONE;
 #ifdef JIARRAY_DEBUG
-        std::memset(sizeOfRank, 0, RANK * sizeof(int));
-
         for (int i = 0; i < RANK - 1; i++) {
+	    sizeOfRank[i] = 0;
             if (rankSize[i] != 0) sizeOfRank[i] = rankSize[i + 1] / rankSize[i];
         }
+	sizeOfRank[RANK-1] = 0;
         if (rankSize[RANK - 1] != 0) sizeOfRank[RANK - 1] = size / rankSize[RANK - 1];
 #endif
     }
