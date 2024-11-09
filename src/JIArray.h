@@ -54,12 +54,11 @@ public:
               typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
     JIArray(Args... args) {
         init(args...);
-    };
+    }
 
     JIArray(T* memory_, decltype(INTS)... args) {
         init(args..., memory_);
-    };
-
+    }
 
     template <typename... INTS2, typename = std::enable_if_t<(sizeof...(INTS2) == 2 * RANK)>>
     void init0(INTS2... array_sizes) {
@@ -85,8 +84,11 @@ public:
     }
 
     void init(int sizes[RANK]) {
-
         destroy();
+
+        for (int i = 0; i < RANK; i++) {
+            if (sizes[i] == 0) return;
+        }
 
         int ioffset = 0;
 
@@ -126,15 +128,18 @@ public:
 
         allocated = JIARRAY_ALLOCATED_NONE;
 #ifdef JIARRAY_DEBUG
+        std::memset(sizeOfRank, 0, RANK * sizeof(int));
+
         for (int i = 0; i < RANK - 1; i++) {
-            sizeOfRank[i] = rankSize[i + 1] / rankSize[i];
+            if (rankSize[i] != 0) sizeOfRank[i] = rankSize[i + 1] / rankSize[i];
         }
-        sizeOfRank[RANK - 1] = size / rankSize[RANK - 1];
+        if (rankSize[RANK - 1] != 0) sizeOfRank[RANK - 1] = size / rankSize[RANK - 1];
 #endif
     }
 
     void initByRankSize(int size, const int* rankSizes, const int* offsets) {
         destroy();
+        if (size == 0) return;
 
         mm = new T[size];
         initByRankSize(size, rankSizes, offsets, mm);
@@ -143,7 +148,7 @@ public:
 
     void init(decltype(INTS)... array_sizes, T* memory_) {
         JIARRAY_CHECK_NOT_ALLOCATED();
-        
+
         nn = (array_sizes * ...);
         mm = memory_;
 
@@ -205,7 +210,7 @@ public:
     void setSize(decltype(INTS)... args) {
         destroy();
         init(args...);
-    };
+    }
 
     template <typename... INDEX>
     inline JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
@@ -913,10 +918,10 @@ public:
 
         friend bool operator==(const Iterator& a, const Iterator& b) {
             return a.m_ptr == b.m_ptr;
-        };
+        }
         friend bool operator!=(const Iterator& a, const Iterator& b) {
             return a.m_ptr != b.m_ptr;
-        };
+        }
 
     private:
         pointer m_ptr;
@@ -925,17 +930,17 @@ public:
 public:
     Iterator begin() {
         return Iterator(mm);
-    };
+    }
     Iterator end() {
         return Iterator(mm + nn);
-    }; // 200 is out of bounds
+    } // 200 is out of bounds
 
     const Iterator begin() const {
         return Iterator(mm);
-    };
+    }
     const Iterator end() const {
         return Iterator(mm + nn);
-    }; // 200 is out of bounds
+    } // 200 is out of bounds
 
 public:
     std::vector<T> convertToVector() {
