@@ -50,7 +50,9 @@ public:
         destroy();
     }
 
-    JIArray(decltype(INTS)... args) {
+    template <typename... Args,
+              typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
+    JIArray(Args... args) {
         init(args...);
     };
 
@@ -58,9 +60,6 @@ public:
         init(args..., memory_);
     };
 
-    JIArray(T* memory_)
-        : mm(memory_) {
-    }
 
     template <typename... INTS2, typename = std::enable_if_t<(sizeof...(INTS2) == 2 * RANK)>>
     void init0(INTS2... array_sizes) {
@@ -78,12 +77,16 @@ public:
         setOffsets(offsets);
     }
 
-    void init(decltype(INTS)... array_sizes) {
+    template <typename... Args,
+              typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
+    void init(Args... array_sizes) {
         int sizes[] = {static_cast<int>(array_sizes)...};
         init(sizes);
     }
 
     void init(int sizes[RANK]) {
+
+        destroy();
 
         int ioffset = 0;
 
@@ -108,9 +111,11 @@ public:
     }
 
     void initByRankSize(int size, const int* rankSizes, const int* offsets, T* memory) {
+        JIARRAY_CHECK_NOT_ALLOCATED();
 
         nn = size;
 
+        sumOfOffset = 0;
         for (int i = 0; i < RANK; i++) {
             rankSize[i] = rankSizes[i];
             offset[i]   = offsets[i];
@@ -129,12 +134,16 @@ public:
     }
 
     void initByRankSize(int size, const int* rankSizes, const int* offsets) {
+        destroy();
+
         mm = new T[size];
         initByRankSize(size, rankSizes, offsets, mm);
         allocated = JIARRAY_ALLOCATED_ALL;
     }
 
     void init(decltype(INTS)... array_sizes, T* memory_) {
+        JIARRAY_CHECK_NOT_ALLOCATED();
+        
         nn = (array_sizes * ...);
         mm = memory_;
 
@@ -520,15 +529,6 @@ public:
         return out;
     }
 
-    inline JIArray<T, RANK> operator*(const T& val) {
-        JIArray<T, RANK> out;
-        out = *this;
-        for (int i = 0; i < nn; ++i) {
-            out.mm[i] = this->mm[i] * val;
-        }
-        return out;
-    }
-
     inline JIArray<T, RANK>& operator*=(const T& val) {
         for (int i = 0; i < nn; ++i) {
             this->mm[i] *= val;
@@ -546,6 +546,7 @@ public:
     }
 
     inline JIArray<T, RANK> operator*(const JIArray<T, RANK>& array) const {
+        JIARRAY_CHECK_SIZE(nn, array.nn);
         JIArray<T, RANK> result;
 
         result.nn        = array.nn;
@@ -618,8 +619,8 @@ public:
     inline JIArray<T, RANK> friend operator+(const T& val, const JIArray<T, RANK>& array) {
         JIArray<T, RANK> result;
 
-        result.nn            = array.nn;
-        result.mm            = new T[result.nn];
+        result.nn        = array.nn;
+        result.mm        = new T[result.nn];
         result.allocated = JIARRAY_ALLOCATED_ALL;
 
         std::copy(array.rankSize, array.rankSize + RANK, result.rankSize);
@@ -635,7 +636,22 @@ public:
         return result;
     }
 
-    friend inline JIArray<T, RANK> operator*(const T& val, const JIArray<T, RANK>& array) {
+    template <typename Scalar,
+              typename = std::enable_if_t<std::is_arithmetic<Scalar>::value>>
+    friend inline JIArray<T, RANK> operator*(const Scalar& val, const JIArray<T, RANK>& array) {
+        JIArray<T, RANK> result;
+        result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
+
+        for (int i = 0; i < result.nn; ++i) {
+            result.mm[i] = val * array.mm[i];
+        }
+
+        return result;
+    }
+
+    template <typename Scalar,
+              typename = std::enable_if_t<std::is_arithmetic<Scalar>::value>>
+    friend inline JIArray<T, RANK> operator*(const JIArray<T, RANK>& array, const Scalar& val) {
         JIArray<T, RANK> result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
 

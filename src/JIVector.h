@@ -102,10 +102,13 @@ public:
         return vec_impl.data();
     }
 
+    void erase(const_iterator iter) {
+        vec_impl.erase(iter);
+    }
+
     void clear() {
         vec_impl.clear();
     }
-
 
     void operator=(const JIArray<_Tp, 1>& other) {
         ffor(i, 1, other.size()) {
