@@ -77,7 +77,8 @@ public:
     }
 
     template <typename... Args,
-              typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
+              typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>,
+              typename = std::enable_if_t<(sizeof...(Args) == RANK)>>
     void init(Args... array_sizes) {
         int sizes[] = {static_cast<int>(array_sizes)...};
         init(sizes);
