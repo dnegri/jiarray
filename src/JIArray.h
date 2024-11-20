@@ -335,6 +335,19 @@ public:
         return at(index...);
     }
 
+    inline T& operator()(const FastArray<int, RANK>& idx) {
+        int pos = idx(1) - sumOfOffset;
+        JIARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + sizeOfRank[0] - 1);
+        for (int i = 1; i < RANK; i++) {
+            JIARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizeOfRank[i] - 1);
+            pos += rankSize[i] * idx(i + 1);
+        }
+
+        return mm[pos];
+    }
+
+
+
     template <typename... INDEX>
     inline T* data(INDEX... index) {
         int num_idx = sizeof...(index);
@@ -355,17 +368,6 @@ public:
     template <typename... INDEX>
     inline const T* data(INDEX... index) const {
         return const_cast<std::remove_const_t<JIArray<T, RANK>>&>(*this).data(index...);
-    }
-
-    inline T& operator()(const FastArray<int, RANK>& idx) {
-        int pos = idx(1) - sumOfOffset;
-        JIARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + sizeOfRank[0] - 1);
-        for (int i = 1; i < RANK; i++) {
-            JIARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizeOfRank[i] - 1);
-            pos += rankSize[i] * idx(i + 1);
-        }
-
-        return mm[pos];
     }
 
     template <typename... INTS2>

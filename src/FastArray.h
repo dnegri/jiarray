@@ -13,21 +13,21 @@ public:
     FastArray() {
     }
 
-    FastArray(std::initializer_list<T> arrays) {
+    explicit FastArray(std::initializer_list<T> arrays) {
         int idx = -1;
         for (const auto& value : arrays) {
             mm[++idx] = value;
         }
     }
 
-    FastArray(const T& val) {
+    explicit FastArray(const T& val) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = val;
         }
     }
 
     template <size_t array_size>
-    FastArray(T (&a)[array_size]) {
+    explicit FastArray(T (&a)[array_size]) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = a[i];
         }
