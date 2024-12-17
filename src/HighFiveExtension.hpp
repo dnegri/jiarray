@@ -42,7 +42,7 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
     }
 
     static void prepare(type& val, const std::vector<size_t>& dims) {
-        if (val.data() == nullptr) throw std::runtime_error("JIArray is not allocated");
+        // if (val.data() == nullptr) throw std::runtime_error("JIArray is not allocated");
 
         auto this_size = getDimensions(val);
         if (this_size != dims) throw std::runtime_error("Mismatched dimensions");

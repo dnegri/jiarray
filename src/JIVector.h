@@ -1,69 +1,47 @@
 #pragma once
 
 #include "JIArray.h"
+#include <algorithm>
+#include <initializer_list>
 #include <vector>
 
 namespace dnegri::jiarray {
 
 template <typename _Tp, typename _Alloc = std::allocator<_Tp>>
-class JIVector {
-private:
-    typedef typename std::vector<_Tp>::reference              reference;
-    typedef typename std::vector<_Tp>::const_reference        const_reference;
-    typedef typename std::vector<_Tp, _Alloc>::const_iterator const_iterator;
-
-    std::vector<_Tp, _Alloc> vec_impl;
-
+class JIVector : public std::vector<_Tp, _Alloc> {
 public:
-    JIVector() {
+    using Base = std::vector<_Tp, _Alloc>;
+    using typename Base::const_iterator;
+    using typename Base::const_reference;
+    using typename Base::iterator;
+    using typename Base::reference;
+
+    // Constructors
+    JIVector() = default;
+
+    JIVector(std::initializer_list<_Tp> il)
+        : Base(il) {
     }
 
-    JIVector(std::initializer_list<_Tp> il) {
-        vec_impl = il;
+    JIVector(const std::vector<_Tp>& vec)
+        : Base(vec) {
     }
 
-    JIVector(const std::vector<_Tp>& vec) {
-        vec_impl = vec;
-    }
-
-    reference front() {
-        return vec_impl.front();
-    }
-
-    const_reference front() const {
-        return vec_impl.front();
-    }
-
-    reference back() {
-        return vec_impl.back();
-    }
-
-    const_reference back() const {
-        return vec_impl.back();
-    }
-
+    // Accessors with custom offset
     reference operator[](int index) {
-        return vec_impl[index - JIARRAY_OFFSET];
+        return Base::operator[](index - JIARRAY_OFFSET);
     }
 
-    void push_back(const _Tp& value) {
-        vec_impl.push_back(value);
+    const_reference operator[](int index) const {
+        return Base::operator[](index - JIARRAY_OFFSET);
     }
 
     reference at(int index) {
-        return vec_impl.at(index - JIARRAY_OFFSET);
+        return Base::at(index - JIARRAY_OFFSET);
     }
 
     const_reference at(int index) const {
-        return vec_impl.at(index - JIARRAY_OFFSET);
-    }
-
-    _Tp* getMemory(int index) {
-        return &vec_impl.at(index);
-    }
-
-    _Tp* get_pointer() {
-        return vec_impl.data();
+        return Base::at(index - JIARRAY_OFFSET);
     }
 
     reference operator()(int index) {
@@ -74,40 +52,34 @@ public:
         return this->at(index);
     }
 
-    size_t size() const {
-        return vec_impl.size();
-    }
-
-    void resize(size_t count) {
-        vec_impl.resize(count);
+    iterator begin() {
+        return Base::begin();
     }
 
     const_iterator begin() const {
-        return vec_impl.begin();
+        return Base::begin();
+    }
+
+    iterator end() {
+        return Base::end();
     }
 
     const_iterator end() const {
-        return vec_impl.end();
+        return Base::end();
     }
 
-    const std::vector<_Tp>& std() const {
-        return vec_impl;
+    // Memory access
+    _Tp* getMemory(int index) {
+        return &Base::at(index);
     }
 
-    _Tp* data() {
-        return vec_impl.data();
+    _Tp* get_pointer() {
+        return Base::data();
     }
 
-    const _Tp* data() const {
-        return vec_impl.data();
-    }
-
-    void erase(const_iterator iter) {
-        vec_impl.erase(iter);
-    }
-
-    void clear() {
-        vec_impl.clear();
+    // Assignment operators
+    void operator=(const std::vector<_Tp>& other) {
+        Base::operator=(other);
     }
 
     void operator=(const JIArray<_Tp, 1>& other) {
@@ -116,36 +88,36 @@ public:
         }
     }
 
-    void operator=(const std::vector<_Tp>& other) {
-        vec_impl = other;
-    }
-
+    // Contains method
     bool contains(const _Tp& value) const {
-        return std::find(vec_impl.begin(), vec_impl.end(), value) != vec_impl.end();
+        return std::find(Base::begin(), Base::end(), value) != Base::end();
     }
 
+    // Insert methods
     void insert(const_iterator iter, std::initializer_list<_Tp> il) {
-        vec_impl.insert(iter, il);
+        Base::insert(iter, il);
     }
 
     void insert(const_iterator iter, const JIVector<_Tp>& other) {
-        vec_impl.insert(iter, other.begin(), other.end());
-    }
-
-    void insert(const_iterator iter, const JIArray<_Tp, 1>& other) {
-        vec_impl.insert(iter, other.begin(), other.end());
+        Base::insert(iter, other.begin(), other.end());
     }
 
     void insert(const_iterator iter, const std::vector<_Tp>& other) {
-        vec_impl.insert(iter, other.begin(), other.end());
+        Base::insert(iter, other.begin(), other.end());
+    }
+
+    void insert(const_iterator iter, const JIArray<_Tp>& other) {
+        Base::insert(iter, other.begin(), other.end());
     }
 
 };
+
 template <typename T>
 using zvector = JIVector<T>;
 
 using zstrings = JIVector<std::string>;
 using zdoubles = JIVector<double>;
-using zfloats = JIVector<float>;
-using zints = JIVector<int>;
+using zfloats  = JIVector<float>;
+using zints    = JIVector<int>;
+
 }; // namespace dnegri::jiarray

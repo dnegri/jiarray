@@ -884,11 +884,6 @@ public:
             return tmp;
         }
 
-        const Iterator& operator++() const {
-            m_ptr++;
-            return *this;
-        }
-
         const Iterator operator++(int) const {
             Iterator tmp = *this;
             ++(*this);
@@ -904,11 +899,6 @@ public:
             Iterator temp = *this;
             --(*this);
             return temp;
-        }
-
-        const Iterator& operator--() const {
-            --m_ptr;
-            return *this;
         }
 
         const Iterator operator--(int) const {
