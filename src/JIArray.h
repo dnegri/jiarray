@@ -346,8 +346,6 @@ public:
         return mm[pos];
     }
 
-
-
     template <typename... INDEX>
     inline T* data(INDEX... index) {
         int num_idx = sizeof...(index);
@@ -399,7 +397,11 @@ public:
     }
 
     inline JIArray<T, RANK>& operator=(const std::vector<T>& val) {
-        JIARRAY_CHECK_SIZE(nn, val.size());
+        if (nn == 0) {
+            init(val.size());
+        } else {
+            JIARRAY_CHECK_SIZE(nn, val.size());
+        }
 
         for (int i = 0; i < nn; ++i) {
             mm[i] = val[i];
