@@ -18,7 +18,9 @@ struct inspector<dnegri::jiarray::JIArray<T, N>> {
                                                   inspector<value_type>::is_trivially_copyable;
 
     static std::vector<size_t> getDimensions(const type& val) {
-        std::vector<size_t> sizes(ndim);
+        std::vector<size_t> sizes(ndim, 0);
+
+        if(val.size() == 0) return sizes;
 
         const int* rankSize = val.getRankSize();
 
