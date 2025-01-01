@@ -1,5 +1,6 @@
 #pragma once
 #include <JIArray.h>
+#include <JIVector.h>
 #include <highfive/H5File.hpp>
 
 using namespace HighFive;
