@@ -388,7 +388,7 @@ public:
     }
 
     inline JIArray<T, RANK>& operator=(const T& val) {
-
+        assert(nn > 0);
         for (int i = 0; i < nn; ++i) {
             mm[i] = val;
         }
@@ -411,6 +411,7 @@ public:
     }
 
     inline JIArray<T, RANK>& operator=(const T* array) {
+        assert(nn > 0);
 
         for (int i = 0; i < nn; ++i) {
             mm[i] = array[i];

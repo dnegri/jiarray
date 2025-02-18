@@ -4,7 +4,7 @@
 using namespace dnegri::jiarray;
 
 TEST(JIArrayTestsWithOffset, InitializationAndAccess) {
-    double2 array(2, 2);  // Initialize with dimensions
+    zdouble2 array(2, 2);  // Initialize with dimensions
     array = {1.0, 2.0, 3.0, 4.0};  // Use assignment operator to set values
 
     EXPECT_EQ(array(1, 1), 1.0);  // Column 1, Row 1
@@ -14,9 +14,9 @@ TEST(JIArrayTestsWithOffset, InitializationAndAccess) {
 }
 
 TEST(JIArrayTestsWithOffset, AssignmentOperator) {
-    double2 array1(2, 2);
+    zdouble2 array1(2, 2);
     array1 = {1.0, 2.0, 3.0, 4.0};
-    double2 array2(2, 2);
+    zdouble2 array2(2, 2);
     array2 = array1;
     EXPECT_EQ(array2(1, 1), 1.0);
     EXPECT_EQ(array2(2, 1), 2.0);
@@ -25,9 +25,9 @@ TEST(JIArrayTestsWithOffset, AssignmentOperator) {
 }
 
 TEST(JIArrayTestsWithOffset, CopyConstructor) {
-    double2 array1(2, 2);
+    zdouble2 array1(2, 2);
     array1 = {1.0, 2.0, 3.0, 4.0};
-    double2 array2(array1);
+    zdouble2 array2(array1);
     EXPECT_EQ(array2(1, 1), 1.0);
     EXPECT_EQ(array2(2, 1), 2.0);
     EXPECT_EQ(array2(1, 2), 3.0);
@@ -42,9 +42,9 @@ TEST(JIArrayTestsWithOffset, Slicing) {
 }
 
 TEST(JIArrayTestsWithOffset, ArithmeticOperations) {
-    double2 array1(2, 2);
+    zdouble2 array1(2, 2);
     array1 = {1.0, 2.0, 3.0, 4.0};
-    double2 array2(2, 2);
+    zdouble2 array2(2, 2);
     array2 = {5.0, 6.0, 7.0, 8.0};
 
     auto result = array1 + array2;
@@ -67,7 +67,7 @@ TEST(JIArrayTestsWithOffset, ArithmeticOperations) {
 }
 
 TEST(JIArrayTestsWithOffset, Reshape) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
     auto reshaped = array.reshape(4);
     EXPECT_EQ(reshaped.size(), 4);
@@ -78,7 +78,7 @@ TEST(JIArrayTestsWithOffset, Reshape) {
 }
 
 TEST(JIArrayTestsWithOffset, ContainsAndFind) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
     EXPECT_TRUE(array.contains(3.0));
     EXPECT_FALSE(array.contains(5.0));
@@ -89,7 +89,7 @@ TEST(JIArrayTestsWithOffset, ContainsAndFind) {
 }
 
 TEST(JIArrayTestsWithOffset, MaxLoc) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 5.0, 3.0, 4.0};
     auto maxLoc = array.maxloc();
     EXPECT_EQ(maxLoc(1), 2);
@@ -97,14 +97,14 @@ TEST(JIArrayTestsWithOffset, MaxLoc) {
 }
 
 TEST(JIArrayTestsWithOffset, AverageSum) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
     EXPECT_DOUBLE_EQ(array.average(), 2.5);
     EXPECT_DOUBLE_EQ(array.sum(), 10.0);
 }
 
 TEST(JIArrayTestsWithOffset, IteratorTest) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
     double sum = 0.0;
     for (auto it = array.begin(); it != array.end(); ++it) {
@@ -114,9 +114,9 @@ TEST(JIArrayTestsWithOffset, IteratorTest) {
 }
 
 TEST(JIArrayTestsWithOffset, ShareWith) {
-    double2 array1(2, 2);
+    zdouble2 array1(2, 2);
     array1 = {1.0, 2.0, 3.0, 4.0};
-    double2 array2;
+    zdouble2 array2;
     array2.shareWith(array1);
 
     EXPECT_EQ(array2(1, 1), 1.0);
@@ -126,7 +126,7 @@ TEST(JIArrayTestsWithOffset, ShareWith) {
 }
 
 TEST(JIArrayTestsWithOffset, ConversionToVector) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
     std::vector<double> vec = array.convertToVector();
     EXPECT_EQ(vec.size(), 4);
@@ -137,7 +137,7 @@ TEST(JIArrayTestsWithOffset, ConversionToVector) {
 }
 
 TEST(JIArrayTestsWithOffset, ScalarMultiplication) {
-    double2 array(2, 2);
+    zdouble2 array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
     auto result = 2.0 * array;
     EXPECT_EQ(result(1, 1), 2.0);
@@ -147,9 +147,9 @@ TEST(JIArrayTestsWithOffset, ScalarMultiplication) {
 }
 
 TEST(JIArrayTestsWithOffset, DotProduct) {
-    double2 array1(2, 2);
+    zdouble2 array1(2, 2);
     array1 = {1.0, 2.0, 3.0, 4.0};
-    double2 array2(2, 2);
+    zdouble2 array2(2, 2);
     array2 = {5.0, 6.0, 7.0, 8.0};
     double dot_product = dot(array1, array2);
     EXPECT_DOUBLE_EQ(dot_product, 70.0);

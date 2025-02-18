@@ -61,7 +61,6 @@ public:
         return mx;
     }
 
-
     inline T& operator()(int i) {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return mm[i - OFFSET];
@@ -193,16 +192,16 @@ template <int I>
 using fstring1d = dnegri::jiarray::StringFastArray<I>;
 
 template <int I, int J>
-using fbool2d = dnegri::jiarray::FastArray<bool, I, J>;
+using fbool2d = dnegri::jiarray::FastArray2D<bool, I, J>;
 
 template <int I, int J>
-using fint2d = dnegri::jiarray::FastArray<int, I, J>;
+using fint2d = dnegri::jiarray::FastArray2D<int, I, J>;
 
 template <int I, int J>
-using ffloat2d = dnegri::jiarray::FastArray<float, I, J>;
+using ffloat2d = dnegri::jiarray::FastArray2D<float, I, J>;
 
 template <int I, int J>
-using fdouble2d = dnegri::jiarray::FastArray<double, I, J>;
+using fdouble2d = dnegri::jiarray::FastArray2D<double, I, J>;
 
 template <class T, int I>
 using farray = dnegri::jiarray::FastArray<T, I>;

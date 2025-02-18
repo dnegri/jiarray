@@ -15,8 +15,12 @@ include_directories(/opt/homebrew/include)
 # Add test source files
 file(GLOB SOURCES ./test/simple_test.cpp ./test/slice_test.cpp)
 
+add_executable(${PROJECT_NAME} ./test/iter_test.cpp  ./test/range_test.cpp ./test/main.cpp)
+
 if(GTest_FOUND)
   enable_testing()
+
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}  -DJIARRAY_DEBUG")
 
   add_executable(${PROJECT_NAME}.test ${SOURCES})
   target_link_libraries(

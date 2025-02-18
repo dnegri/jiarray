@@ -36,9 +36,9 @@ int iter_test() {
 
     float *p_phif = d_phif, *p_xsnf = d_xsnf;
 
-    float3 ji_phif3(ng, nxy, nz);
-    float3 ji_xsnf3(ng, nxy, nz);
-    float2 ji_psi3(nxy, nz);
+    zfloat3 ji_phif3(ng, nxy, nz);
+    zfloat3 ji_xsnf3(ng, nxy, nz);
+    zfloat2 ji_psi3(nxy, nz);
 
     auto begin = clock();
 
