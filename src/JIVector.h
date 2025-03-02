@@ -110,6 +110,9 @@ public:
         Base::insert(iter, other.begin(), other.end());
     }
 
+    void insert(const_iterator iter, const_iterator first, const_iterator last) {
+        Base::insert(iter, first, last);
+    }
 };
 
 template <typename T>

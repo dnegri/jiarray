@@ -208,9 +208,26 @@ public:
             sumOfOffset += rankSize[i] * offset[i];
     }
 
-    void setSize(decltype(INTS)... args) {
+    void setSize(decltype(INTS)... array_sizes) {
+        auto sizes = {static_cast<int>(array_sizes)...};
+
+        bool same = true;
+
+        int newRankSize[RANK]{};
+
+        newRankSize[0] = 1;
+        for (int i = 1; i < RANK; i++) {
+            newRankSize[i] = newRankSize[i - 1] * sizes[i - 1];
+            if (newRankSize[i] != rankSize[i]) {
+                same = false;
+                break;
+            }
+        }
+
+        if (same) return;
+
         destroy();
-        init(args...);
+        init(array_sizes...);
     }
 
     template <typename... INDEX>
@@ -406,7 +423,10 @@ public:
 
     inline JIArray<T, RANK>& operator=(const std::vector<T>& val) {
         if (nn == 0) {
-            init(val.size());
+            int size[RANK];
+            std::fill(size, size + RANK, 1);
+            size[RANK - 1] = val.size();
+            init(size);
         } else {
             JIARRAY_CHECK_SIZE(nn, val.size());
         }
@@ -702,7 +722,7 @@ public:
     friend inline T dot(const JIArray<T, RANK>& array1, const JIArray<T, RANK>& array2) {
         // #ifdef JIARRAY_DEBUG
         for (int rank = 0; rank < RANK; ++rank) {
-            assert(array1.this->sizes[rank] == array2.this->sizes[rank]);
+            assert(array1.sizes[rank] == array2.sizes[rank]);
             assert(array1.offset[rank] == array2.offset[rank]);
             JIARRAY_CHECK_SIZE(array1.nn, array2.nn);
         }
