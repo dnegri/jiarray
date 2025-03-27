@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FastArray.h"
+#include "JIArray.h"
 #include "pch.h"
 #include <numeric>
 #include <vector>
@@ -8,10 +9,10 @@
 namespace dnegri::jiarray {
 
 template <class T, std::size_t RANK = 1, class = std::make_index_sequence<RANK>>
-class JIArray;
+class JICudaArray;
 
 template <class T, std::size_t RANK, std::size_t... INTS>
-class JIArray<T, RANK, std::index_sequence<INTS...>> {
+class JICudaArray<T, RANK, std::index_sequence<INTS...>> {
 private:
     int nn        = 0;
     T*  mm        = nullptr;
@@ -26,15 +27,15 @@ private:
     // #endif
 
 public:
-    __host__ __device__ JIArray() {
+    __host__ __device__ JICudaArray() {
     }
 
-    __host__ __device__ JIArray(std::initializer_list<T> il)
-        : JIArray(il.size()) {
+    __host__ __device__ JICudaArray(std::initializer_list<T> il)
+        : JICudaArray(il.size()) {
         std::copy(il.begin(), il.end(), mm);
     }
 
-    __host__ __device__ JIArray(const JIArray<T, RANK>& array) {
+    __host__ __device__ JICudaArray(const JICudaArray<T, RANK>& array) {
         nn = array.nn;
         mm = array.mm;
         std::copy((int*)array.rankSize, ((int*)array.rankSize) + RANK, rankSize);
@@ -47,29 +48,29 @@ public:
         // #endif
     }
 
-    __host__ __device__ virtual ~JIArray() {
+    __host__ __device__ virtual ~JICudaArray() {
         destroy();
     }
 
     template <typename... Args,
               typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
-    __host__ __device__ JIArray(Args... args) {
+    JICudaArray(Args... args) {
         init(args...);
     }
 
-    __host__ __device__ JIArray(T* memory_, decltype(INTS)... args) {
+    JICudaArray(T* memory_, decltype(INTS)... args) {
         init(args..., memory_);
     }
 
     template <typename... INTS2, typename = std::enable_if_t<(sizeof...(INTS2) == 2 * RANK)>>
-    __host__ __device__ void init0(INTS2... array_sizes) {
+    void init0(INTS2... array_sizes) {
         int temp_size[] = {static_cast<int>(array_sizes)...};
 
         int sizes[RANK];
         int offsets[RANK];
 
         for (int i = 0; i < RANK; i++) {
-            sizes[i]   = temp_size[2 * i + 1] - temp_size[2 * i] + 1;
+            sizes[i]   = temp_size[2 * i + 1] - temp_size[2 * i] + JIARRAY_OFFSET;
             offsets[i] = temp_size[2 * i];
         }
 
@@ -77,15 +78,13 @@ public:
         setOffsets(offsets);
     }
 
-    template <typename... Args,
-              typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>,
-              typename = std::enable_if_t<(sizeof...(Args) == RANK)>>
-              __host__ __device__ void init(Args... array_sizes) {
+    template <typename... Args, typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>, typename = std::enable_if_t<(sizeof...(Args) == RANK)>>
+    void init(Args... array_sizes) {
         int sizes[] = {static_cast<int>(array_sizes)...};
         init(sizes);
     }
 
-    __host__ __device__ void init(int sizes[RANK]) {
+    void init(int sizes[RANK]) {
         destroy();
 
         for (int i = 0; i < RANK; i++) {
@@ -106,14 +105,12 @@ public:
             sumOfOffset += offset[i] * rankSize[i];
         }
 
-        mm = new T[nn]{};
+        // mm = new T[nn]{};
+        cudaMallocManaged(&mm, nn * sizeof(T));
 
         allocated = JIARRAY_ALLOCATED_ALL;
         // #ifdef JIARRAY_DEBUG
-        // std::copy(sizes, sizes + RANK, this->sizes);
-        for (auto i = 0; i < RANK; i++)
-            this->sizes[i] = sizes[i];
-
+        std::copy(sizes, sizes + RANK, this->sizes);
         // #endif
     }
 
@@ -180,7 +177,7 @@ public:
     __host__ __device__ void destroy() {
         if (allocated != JIARRAY_ALLOCATED_NONE) {
             if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && mm != nullptr) {
-                delete[] mm;
+                cudaFree(mm);
             }
             mm        = nullptr;
             allocated = JIARRAY_ALLOCATED_NONE;
@@ -188,7 +185,7 @@ public:
         }
     }
 
-    __host__ __device__ void erase() {
+    void erase() {
         destroy();
         std::fill(rankSize, rankSize + RANK, 0);
         std::fill(offset, offset + RANK, 0);
@@ -200,14 +197,14 @@ public:
 
     template <typename... Args,
               typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
-    __host__ __device__ inline void setOffsets(Args... offsets) {
+    inline void setOffsets(Args... offsets) {
         static_assert(sizeof...(offsets) > 0, "Offsets cannot be empty");
 
         int tempOffsets[] = {static_cast<int>(offsets)...}; // Expand to an array
         setOffsets(tempOffsets);                            // Call overloaded function
     }
 
-    __host__ __device__ inline void setOffsets(int offsets[RANK]) {
+    inline void setOffsets(int offsets[RANK]) {
         std::copy(offsets, offsets + RANK, offset);
 
         sumOfOffset = 0;
@@ -215,17 +212,13 @@ public:
             sumOfOffset += rankSize[i] * offset[i];
     }
 
-    __host__ __device__ void setSize(decltype(INTS)... array_sizes) {
+    void setSize(decltype(INTS)... array_sizes) {
         size_t sizes[] = {static_cast<size_t>(array_sizes)...};
 
         bool same = true;
 
-        int newRankSize[RANK]{};
-
-        newRankSize[0] = 1;
-        for (int i = 1; i < RANK; i++) {
-            newRankSize[i] = newRankSize[i - 1] * sizes[i - 1];
-            if (newRankSize[i] != rankSize[i]) {
+        for (int i = 0; i < RANK; i++) {
+            if (this->sizes[i] != sizes[i]) {
                 same = false;
                 break;
             }
@@ -233,12 +226,34 @@ public:
 
         if (same) return;
 
+        auto new_array = JICudaArray<T, RANK>();
+        new_array.init(array_sizes...);
+
+        // complete copy this to new_array with copy_size
+        for (int new_pos = 0; new_pos < new_array.nn; new_pos++) {
+            int idx[RANK];
+            int temp = new_pos;
+            for (int j = RANK - 1; j >= 0; j--) {
+                idx[j] = temp % sizes[j];
+                temp /= sizes[j];
+            }
+
+            int old_pos = 0;
+            for (int j = 0; j < RANK; j++) {
+                old_pos += idx[j] * rankSize[j];
+            }
+
+            new_array.mm[new_pos] = mm[old_pos];
+        }
+
         destroy();
-        init(array_sizes...);
+        initByRankSize(new_array.getSize(), new_array.getRankSize(), new_array.getOffset(), new_array.getMemory());
+        new_array.allocated = JIARRAY_ALLOCATED_NONE;
+        allocated           = JIARRAY_ALLOCATED_ALL;
     }
 
     template <typename... INDEX>
-    __host__ __device__ inline JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
+    __host__ __device__ inline JICudaArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
         constexpr int RANK2   = RANK - sizeof...(INDEX);
         constexpr int num_idx = sizeof...(INDEX);
 
@@ -252,12 +267,12 @@ public:
             p_mm += rankSize[rank] * (idx[i] - offset[rank]);
         }
 
-        auto array = JIArray<T, RANK2>();
+        auto array = JICudaArray<T, RANK2>();
         array.initByRankSize(rankSize[RANK2], rankSize, offset, mm + p_mm);
         return array;
     }
 
-    __host__ __device__ inline bool isAllocated() const {
+    inline bool isAllocated() const {
         return allocated != JIARRAY_ALLOCATED_NONE;
     }
 
@@ -269,7 +284,7 @@ public:
         return mm + idx;
     }
 
-    __host__ __device__ inline T* data() {
+    inline T* data() {
         return mm;
     }
 
@@ -281,7 +296,7 @@ public:
         return nn;
     }
 
-    __host__ __device__ inline T average() const {
+    inline T average() const {
         T result = 0.0;
         for (int i = 0; i < nn; ++i) {
             result += mm[i];
@@ -289,12 +304,12 @@ public:
         return result / nn;
     }
 
-    __host__ __device__ inline T sum() const {
+    inline T sum() const {
         T result = std::accumulate(mm, mm + nn, 0.0);
         return result;
     }
 
-    __host__ __device__ inline T max() const {
+    inline T max() const {
         T mx = mm[0];
         for (int i = 1; i < nn; ++i) {
             if (mm[i] > mx)
@@ -303,7 +318,7 @@ public:
         return mx;
     }
 
-    __host__ __device__ inline T min() const {
+    inline T min() const {
         T mx = mm[0];
         for (int i = 1; i < nn; ++i) {
             if (mm[i] < mx)
@@ -312,7 +327,7 @@ public:
         return mx;
     }
 
-    __host__ __device__ inline int getSize() const {
+    inline int getSize() const {
         return nn;
     }
 
@@ -353,7 +368,7 @@ public:
     }
 
     __host__ __device__ inline const T& at(decltype(INTS)... index) const {
-        return const_cast<std::remove_const_t<JIArray<T, RANK>>&>(*this).at(index...);
+        return const_cast<std::remove_const_t<JICudaArray<T, RANK>>&>(*this).at(index...);
     }
 
     __host__ __device__ inline const T& operator[](size_t index) const {
@@ -363,7 +378,6 @@ public:
     __host__ __device__ inline T& operator[](size_t index) {
         return at(index);
     }
-
 
     __host__ __device__ inline const T& operator()(decltype(INTS)... index) const {
         return at(index...);
@@ -385,7 +399,7 @@ public:
     }
 
     template <typename... INDEX>
-    __host__ __device__ inline T* data(INDEX... index) {
+    inline T* data(INDEX... index) {
         int num_idx = sizeof...(index);
         JIARRAY_CHECK_BOUND(num_idx, 1, RANK);
 
@@ -403,20 +417,20 @@ public:
 
     template <typename... INDEX>
     __host__ __device__ inline const T* data(INDEX... index) const {
-        return const_cast<std::remove_const_t<JIArray<T, RANK>>&>(*this).data(index...);
+        return const_cast<std::remove_const_t<JICudaArray<T, RANK>>&>(*this).data(index...);
     }
 
     template <typename... INTS2>
-    __host__ __device__ inline JIArray<T, sizeof...(INTS2)> reshape(INTS2... sizes) {
+    inline JICudaArray<T, sizeof...(INTS2)> reshape(INTS2... sizes) {
         constexpr int RANK2 = sizeof...(INTS2);
 
-        JIArray<T, RANK2> array;
+        JICudaArray<T, RANK2> array;
         array.init(sizes..., getMemory());
 
         return array;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator=(const std::initializer_list<T>& list) {
+    inline JICudaArray<T, RANK>& operator=(const std::initializer_list<T>& list) {
         JIARRAY_CHECK_SIZE(this->nn, list.size());
         int idx = 0;
         for (const T& val : list) {
@@ -425,7 +439,7 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator=(const T& val) {
+    inline JICudaArray<T, RANK>& operator=(const T& val) {
         assert(nn > 0);
         for (int i = 0; i < nn; ++i) {
             mm[i] = val;
@@ -434,7 +448,8 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator=(const std::vector<T>& val) {
+    template <typename T2>
+    inline JICudaArray<T, RANK>& operator=(const std::vector<T2>& val) {
         if (nn == 0) {
             int size[RANK];
             std::fill(size, size + RANK, 1);
@@ -451,7 +466,7 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator=(const T* array) {
+    inline JICudaArray<T, RANK>& operator=(const T* array) {
         assert(nn > 0);
 
         for (int i = 0; i < nn; ++i) {
@@ -461,7 +476,7 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator=(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK>& operator=(const JICudaArray<T, RANK>& array) {
         if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
             initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
 
@@ -484,7 +499,31 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline bool operator==(const JIArray<T, RANK>& array) const {
+    template <typename T2>
+    inline JICudaArray<T, RANK>& operator=(const JIArray<T2, RANK>& array) {
+        if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
+            initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
+
+        } else {
+            // #ifdef JIARRAY_DEBUG
+            JIARRAY_CHECK_SIZE(nn, array.getSize());
+
+            auto arraySizeOfRank = array.getSizeOfRank();
+            auto arrayOffset     = array.getOffset();
+            for (int rank = 0; rank < RANK; ++rank) {
+                assert(this->sizes[rank] == arraySizeOfRank[rank]);
+                assert(offset[rank] == arrayOffset[rank]);
+            }
+            // #endif
+        }
+
+        auto arrayMemory = array.data();
+        std::copy(arrayMemory, arrayMemory + nn, mm);
+
+        return *this;
+    }
+
+    inline bool operator==(const JICudaArray<T, RANK>& array) const {
         if (nn != array.nn)
             return false;
 
@@ -496,14 +535,14 @@ public:
         return true;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator+=(const T& val) {
+    inline JICudaArray<T, RANK>& operator+=(const T& val) {
         for (int i = 0; i < nn; ++i) {
             this->mm[i] += val;
         }
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator+=(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK> operator+=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
 
         for (int i = 0; i < nn; ++i) {
@@ -512,9 +551,9 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator+(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK> operator+(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> out;
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] + array.mm[i];
@@ -522,9 +561,9 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator+(const JIArray<T, RANK>& array) const {
+    inline JICudaArray<T, RANK> operator+(const JICudaArray<T, RANK>& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> out;
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] + array.mm[i];
@@ -532,7 +571,7 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator-=(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK>& operator-=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         for (int i = 0; i < nn; ++i) {
             mm[i] -= array.mm[i];
@@ -540,9 +579,9 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator-(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK> operator-(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> out;
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] - array.mm[i];
@@ -550,8 +589,8 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> friend operator-(const JIArray<T, RANK>& array) {
-        JIArray<T, RANK> out;
+    inline JICudaArray<T, RANK> friend operator-(const JICudaArray<T, RANK>& array) {
+        JICudaArray<T, RANK> out;
         out = array;
         for (int i = 0; i < out.nn; ++i) {
             out.mm[i] = -out.mm[i];
@@ -559,9 +598,9 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator-(const JIArray<T, RANK>& array) const {
+    inline JICudaArray<T, RANK> operator-(const JICudaArray<T, RANK>& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> out;
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] - array.mm[i];
@@ -569,9 +608,9 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator*(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK> operator*(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> out;
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] * array.mm[i];
@@ -579,14 +618,14 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator*=(const T& val) {
+    inline JICudaArray<T, RANK>& operator*=(const T& val) {
         for (int i = 0; i < nn; ++i) {
             this->mm[i] *= val;
         }
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK>& operator*=(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK>& operator*=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
 
         for (int i = 0; i < nn; ++i) {
@@ -595,9 +634,9 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator*(const JIArray<T, RANK>& array) const {
+    inline JICudaArray<T, RANK> operator*(const JICudaArray<T, RANK>& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> result;
+        JICudaArray<T, RANK> result;
 
         result.nn        = array.nn;
         result.mm        = new T[result.nn];
@@ -616,14 +655,14 @@ public:
         return result;
     }
 
-    __host__ __device__ inline void operator/=(const T& val) {
+    inline void operator/=(const T& val) {
         auto rval = 1.0 / val;
         for (int i = 0; i < nn; ++i) {
             mm[i] *= rval;
         }
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator/=(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK> operator/=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
 
         for (int i = 0; i < nn; ++i) {
@@ -632,9 +671,9 @@ public:
         return *this;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator/(const JIArray<T, RANK>& array) {
+    inline JICudaArray<T, RANK> operator/(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
-        JIArray<T, RANK> out;
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] / array.mm[i];
@@ -642,8 +681,8 @@ public:
         return out;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> operator/(const T& val) {
-        JIArray<T, RANK> out;
+    inline JICudaArray<T, RANK> operator/(const T& val) {
+        JICudaArray<T, RANK> out;
         out = *this;
         for (int i = 0; i < nn; ++i) {
             out.mm[i] = this->mm[i] / val;
@@ -651,7 +690,7 @@ public:
         return out;
     }
 
-    __host__ __device__ inline double sqsum() const {
+    inline double sqsum() const {
         double result = 0;
         for (int i = 0; i < nn; ++i) {
             result += mm[i] * mm[i];
@@ -660,14 +699,14 @@ public:
         return result;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> copy() const {
-        JIArray<T, RANK> array;
+    inline JICudaArray<T, RANK> copy() const {
+        JICudaArray<T, RANK> array;
         array = *this;
         return array;
     }
 
-    __host__ __device__ inline JIArray<T, RANK> friend operator+(const T& val, const JIArray<T, RANK>& array) {
-        JIArray<T, RANK> result;
+    inline JICudaArray<T, RANK> friend operator+(const T& val, const JICudaArray<T, RANK>& array) {
+        JICudaArray<T, RANK> result;
 
         result.nn        = array.nn;
         result.mm        = new T[result.nn];
@@ -688,8 +727,8 @@ public:
 
     template <typename Scalar,
               typename = std::enable_if_t<std::is_arithmetic<Scalar>::value>>
-              __host__ __device__ friend inline JIArray<T, RANK> operator*(const Scalar& val, const JIArray<T, RANK>& array) {
-        JIArray<T, RANK> result;
+    friend inline JICudaArray<T, RANK> operator*(const Scalar& val, const JICudaArray<T, RANK>& array) {
+        JICudaArray<T, RANK> result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
 
         for (int i = 0; i < result.nn; ++i) {
@@ -701,8 +740,8 @@ public:
 
     template <typename Scalar,
               typename = std::enable_if_t<std::is_arithmetic<Scalar>::value>>
-    __host__ __device__ friend inline JIArray<T, RANK> operator*(const JIArray<T, RANK>& array, const Scalar& val) {
-        JIArray<T, RANK> result;
+    friend inline JICudaArray<T, RANK> operator*(const JICudaArray<T, RANK>& array, const Scalar& val) {
+        JICudaArray<T, RANK> result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
 
         for (int i = 0; i < result.nn; ++i) {
@@ -712,8 +751,8 @@ public:
         return result;
     }
 
-    __host__ __device__ friend inline JIArray<T, RANK> operator/(const T& val, const JIArray<T, RANK>& array) {
-        JIArray<T, RANK> result;
+    friend inline JICudaArray<T, RANK> operator/(const T& val, const JICudaArray<T, RANK>& array) {
+        JICudaArray<T, RANK> result;
 
         result.nn            = array.nn;
         result.mm            = new T[result.nn];
@@ -732,7 +771,7 @@ public:
         return result;
     }
 
-    __host__ __device__ friend inline T dot(const JIArray<T, RANK>& array1, const JIArray<T, RANK>& array2) {
+    friend inline T dot(const JICudaArray<T, RANK>& array1, const JICudaArray<T, RANK>& array2) {
         // #ifdef JIARRAY_DEBUG
         for (int rank = 0; rank < RANK; ++rank) {
             assert(array1.sizes[rank] == array2.sizes[rank]);
@@ -748,7 +787,7 @@ public:
         return result;
     }
 
-    __host__ __device__ inline bool contains(const T& item) const {
+    inline bool contains(const T& item) const {
         for (int i = 0; i < nn; ++i) {
             if (mm[i] == item)
                 return true;
@@ -756,7 +795,7 @@ public:
         return false;
     }
 
-    __host__ __device__ inline FastArray<int, RANK> findFirst(const T& item) const {
+    inline FastArray<int, RANK> findFirst(const T& item) const {
         int loc = -1;
         T   value;
         for (int i = 0; i < this->nn; ++i) {
@@ -786,7 +825,7 @@ public:
         return location;
     }
 
-    __host__ __device__ inline FastArray<int, RANK> maxloc() {
+    inline FastArray<int, RANK> maxloc() {
         int maxloc = 0;
         T   maxval = mm[0];
         for (int i = 1; i < this->nn; ++i) {
@@ -811,7 +850,7 @@ public:
         return maxLocation;
     }
 
-    __host__ __device__ inline FastArray<int, RANK> maxloc(int from, int to) {
+    inline FastArray<int, RANK> maxloc(int from, int to) {
         int maxloc = 0;
         T   maxval = mm[from - JIARRAY_OFFSET];
         for (int i = from - JIARRAY_OFFSET + 1; i < to - JIARRAY_OFFSET; ++i) {
@@ -831,7 +870,7 @@ public:
         return maxLocation;
     }
 
-    __host__ __device__ inline void shareWith(const JIArray<T, RANK>& array) {
+    inline void shareWith(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
         nn = array.nn;
@@ -984,34 +1023,34 @@ public:
     }
 };
 
-#define zbool1   JIArray<bool, 1>
-#define zbool2   JIArray<bool, 2>
-#define zbool3   JIArray<bool, 3>
-#define zbool4   JIArray<bool, 4>
-#define zbool5   JIArray<bool, 5>
-#define zint1    JIArray<int, 1>
-#define zint2    JIArray<int, 2>
-#define zint3    JIArray<int, 3>
-#define zint4    JIArray<int, 4>
-#define zint5    JIArray<int, 5>
-#define zdouble1 JIArray<double, 1>
-#define zdouble2 JIArray<double, 2>
-#define zdouble3 JIArray<double, 3>
-#define zdouble4 JIArray<double, 4>
-#define zdouble5 JIArray<double, 5>
-#define zdouble6 JIArray<double, 6>
+#define cbool1   JICudaArray<bool, 1>
+#define cbool2   JICudaArray<bool, 2>
+#define cbool3   JICudaArray<bool, 3>
+#define cbool4   JICudaArray<bool, 4>
+#define cbool5   JICudaArray<bool, 5>
+#define cint1    JICudaArray<int, 1>
+#define cint2    JICudaArray<int, 2>
+#define cint3    JICudaArray<int, 3>
+#define cint4    JICudaArray<int, 4>
+#define cint5    JICudaArray<int, 5>
+#define cdouble1 JICudaArray<double, 1>
+#define cdouble2 JICudaArray<double, 2>
+#define cdouble3 JICudaArray<double, 3>
+#define cdouble4 JICudaArray<double, 4>
+#define cdouble5 JICudaArray<double, 5>
+#define cdouble6 JICudaArray<double, 6>
 
-#define zfloat1 JIArray<float, 1>
-#define zfloat2 JIArray<float, 2>
-#define zfloat3 JIArray<float, 3>
-#define zfloat4 JIArray<float, 4>
-#define zfloat5 JIArray<float, 5>
+#define cfloat1 JICudaArray<float, 1>
+#define cfloat2 JICudaArray<float, 2>
+#define cfloat3 JICudaArray<float, 3>
+#define cfloat4 JICudaArray<float, 4>
+#define cfloat5 JICudaArray<float, 5>
 
-#define zstring1 JIArray<string, 1>
-#define zstring2 JIArray<string, 2>
-#define zstring3 JIArray<string, 3>
-#define zstring4 JIArray<string, 4>
-#define zstring5 JIArray<string, 5>
+#define cstring1 JICudaArray<string, 1>
+#define cstring2 JICudaArray<string, 2>
+#define cstring3 JICudaArray<string, 3>
+#define cstring4 JICudaArray<string, 4>
+#define cstring5 JICudaArray<string, 5>
 
 #if JIARRAY_OFFSET == 0
     #define ffor(i, begin, end)      for (int i = begin; i < end; ++i)
@@ -1024,6 +1063,6 @@ public:
 #define zfor(i, end) ffor(i, JIARRAY_OFFSET, end)
 
 template <typename Type, int N = 1>
-using zarray = JIArray<Type, N>;
+using carray = JICudaArray<Type, N>;
 
 } // namespace dnegri::jiarray

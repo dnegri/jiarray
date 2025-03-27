@@ -10,24 +10,24 @@ public:
     T mm[SIZE]{};
 
 public:
-    FastArray() {
+    __host__ __device__ FastArray() {
     }
 
-    explicit FastArray(std::initializer_list<T> arrays) {
+    explicit __host__ __device__ FastArray(std::initializer_list<T> arrays) {
         int idx = -1;
         for (const auto& value : arrays) {
             mm[++idx] = value;
         }
     }
 
-    explicit FastArray(const T& val) {
+    explicit __host__ __device__ FastArray(const T& val) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = val;
         }
     }
 
     template <size_t array_size>
-    explicit FastArray(T (&a)[array_size]) {
+    __host__ __device__ explicit FastArray(T (&a)[array_size]) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = a[i];
         }
@@ -61,14 +61,23 @@ public:
         return mx;
     }
 
-    inline T& operator()(int i) {
+    __host__ __device__ inline T& operator()(int i) {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return mm[i - OFFSET];
     }
-    inline const T& operator()(int i) const {
+    __host__ __device__ inline const T& operator()(int i) const {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return mm[i - OFFSET];
     }
+
+    __host__ __device__ inline T& operator[](int i) {
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
+        return mm[i - OFFSET];
+    }
+    __host__ __device__ inline const T& operator[](int i) const {
+        JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
+        return mm[i - OFFSET];
+    }    
     inline FastArray<T, SIZE, OFFSET>& operator=(const FastArray<T, SIZE, OFFSET>& array) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = array.mm[i];

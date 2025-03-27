@@ -52,6 +52,10 @@ public:
         return this->at(index);
     }
 
+    _Tp sum() const {
+        return std::accumulate(Base::begin(), Base::end(), 0.0);
+    }
+    
     iterator begin() {
         return Base::begin();
     }
@@ -88,6 +92,18 @@ public:
         }
     }
 
+    void operator*=(const _Tp& value) {
+        for (auto& val : *this) {
+            val *= value;
+        }
+    }
+
+    void operator/=(const _Tp& value) {
+        for (auto& val : *this) {
+            val /= value;
+        }
+    }
+
     // Contains method
     bool contains(const _Tp& value) const {
         return std::find(Base::begin(), Base::end(), value) != Base::end();
@@ -110,7 +126,8 @@ public:
         Base::insert(iter, other.begin(), other.end());
     }
 
-    void insert(const_iterator iter, const_iterator first, const_iterator last) {
+    template <typename _InputIterator, typename = std::_RequireInputIter<_InputIterator>>
+    void insert(const_iterator iter, _InputIterator first, _InputIterator last) {
         Base::insert(iter, first, last);
     }
 };
