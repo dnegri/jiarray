@@ -211,17 +211,18 @@ public:
     void setSize(decltype(INTS)... array_sizes) {
         size_t sizes[] = {static_cast<size_t>(array_sizes)...};
 
-	bool same = true;
+        bool same = true;
 
-        int newRankSize[RANK]{};
+        int newRankSize = 1;
+        int prev_size   = sizes[0];
+        for (int i = 0; i < RANK; ++i) {
 
-        newRankSize[0] = 1;
-        for (int i = 1; i < RANK; i++) {
-            newRankSize[i] = newRankSize[i - 1] * sizes[i - 1];
-            if (newRankSize[i] != rankSize[i]) {
-                same = false;
-                break;
-            }
+            newRankSize = newRankSize * prev_size;
+
+            same = newRankSize == rankSize[i];
+            if (!same) break;
+
+            prev_size = sizes[i];
         }
 
         if (same) return;
