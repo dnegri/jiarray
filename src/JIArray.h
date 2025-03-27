@@ -209,9 +209,9 @@ public:
     }
 
     void setSize(decltype(INTS)... array_sizes) {
-        auto sizes = {static_cast<int>(array_sizes)...};
+        size_t sizes[] = {static_cast<size_t>(array_sizes)...};
 
-        bool same = true;
+	bool same = true;
 
         int newRankSize[RANK]{};
 
