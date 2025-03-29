@@ -360,6 +360,11 @@ public:
 
         int pos = -sumOfOffset;
         for (int i = 0; i < sizeof...(index); i++) {
+            if(!(offset[i] <= idx[i] && idx[i] <= offset[i] + this->sizes[i] - 1)) {
+                printf("Index out of bounds\n");
+                JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
+            }
+
             JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
             pos += rankSize[i] * idx[i];
         }

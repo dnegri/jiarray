@@ -11,6 +11,11 @@
 #include <utility>
 #include <vector>
 
+#ifndef __CUDACC__
+    #define __host__ 
+    #define __device__
+#endif    
+
 namespace dnegri::jiarray {
 
 #ifndef JIARRAY_OFFSET
@@ -18,10 +23,10 @@ namespace dnegri::jiarray {
 #endif
 
 #ifdef JIARRAY_DEBUG
-    #define JIARRAY_CHECK_NOT_ALLOCATED()    if(allocated) throw std::invalid_argument("Already allocated")
-    #define JIARRAY_CHECK_BOUND(i, beg, end) if(i < beg || i > end) throw std::out_of_range("Index out of bounds")
-    #define JIARRAY_CHECK_RANK(r1, r2)       if(r1 != r2) throw std::invalid_argument("Rank mismatch")
-    #define JIARRAY_CHECK_SIZE(r1, r2)       if(r1 != r2) throw std::invalid_argument("Size mismatch")
+    #define JIARRAY_CHECK_NOT_ALLOCATED()    assert(!allocated && "Already allocated")
+    #define JIARRAY_CHECK_BOUND(i, beg, end) assert(beg <= i && i <= end && "Index out of bounds")
+    #define JIARRAY_CHECK_RANK(r1, r2)       assert(r1 == r2 && "Rank mismatch")
+    #define JIARRAY_CHECK_SIZE(r1, r2)       assert(r1 == r2 && "Size mismatch")
 #else
     #define JIARRAY_CHECK_NOT_ALLOCATED()
     #define JIARRAY_CHECK_BOUND(i, beg, end)
