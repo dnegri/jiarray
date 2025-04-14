@@ -6,9 +6,9 @@
 using namespace HighFive;
 using namespace HighFive::details;
 
-template <typename T, size_t N>
-struct inspector<dnegri::jiarray::JIArray<T, N>> {
-    using type       = dnegri::jiarray::JIArray<T, N>;
+template <typename T, size_t N, size_t... INTS>
+struct inspector<dnegri::jiarray::JIArray<T, N, std::index_sequence<INTS...>>> {
+    using type       = dnegri::jiarray::JIArray<T, N, std::index_sequence<INTS...>>;
     using value_type = unqualified_t<T>;
     using base_type  = typename inspector<value_type>::base_type;
     using hdf5_type  = typename inspector<value_type>::hdf5_type;
