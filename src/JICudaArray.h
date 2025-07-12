@@ -4,7 +4,12 @@
 #include "JIArray.h"
 #include "pch.h"
 #include <numeric>
+#include <set>
 #include <vector>
+
+#ifdef JIARRAY_CEREAL
+    #include <cereal/archives/binary.hpp>
+#endif
 
 namespace dnegri::jiarray {
 
@@ -28,6 +33,13 @@ private:
 
 public:
     __host__ __device__ JICudaArray() {
+        nn          = 0;
+        mm          = nullptr;
+        allocated   = JIARRAY_ALLOCATED_NONE;
+        sumOfOffset = 0;
+        memset(rankSize, 0, sizeof(rankSize));
+        memset(offset, 0, sizeof(offset));
+        memset(sizes, 0, sizeof(sizes));
     }
 
     __host__ __device__ JICudaArray(std::initializer_list<T> il)
@@ -108,6 +120,12 @@ public:
         // mm = new T[nn]{};
         cudaMallocManaged(&mm, nn * sizeof(T));
 
+        if (!std::is_trivial<T>::value) {
+            for (int i = 0; i < nn; ++i) {
+                new (&mm[i]) T();
+            }
+        }
+
         allocated = JIARRAY_ALLOCATED_ALL;
         // #ifdef JIARRAY_DEBUG
         std::copy(sizes, sizes + RANK, this->sizes);
@@ -143,7 +161,15 @@ public:
         destroy();
         if (size == 0) return;
 
-        mm = new T[size];
+        // mm = new T[size];
+        cudaMallocManaged(&mm, size * sizeof(T));
+
+        if (!std::is_trivial<T>::value) {
+            for (int i = 0; i < nn; ++i) {
+                new (&mm[i]) T();
+            }
+        }
+
         initByRankSize(size, rankSizes, offsets, mm);
         allocated = JIARRAY_ALLOCATED_ALL;
     }
@@ -296,7 +322,7 @@ public:
         return nn;
     }
 
-    inline T average() const {
+    __host__ __device__ inline T average() const {
         T result = 0.0;
         for (int i = 0; i < nn; ++i) {
             result += mm[i];
@@ -304,7 +330,7 @@ public:
         return result / nn;
     }
 
-    inline T sum() const {
+    __host__ __device__ inline T sum() const {
         T result = std::accumulate(mm, mm + nn, 0.0);
         return result;
     }
@@ -318,7 +344,7 @@ public:
         return mx;
     }
 
-    inline T min() const {
+    __host__ __device__ inline T min() const {
         T mx = mm[0];
         for (int i = 1; i < nn; ++i) {
             if (mm[i] < mx)
@@ -327,7 +353,7 @@ public:
         return mx;
     }
 
-    inline int getSize() const {
+    __host__ __device__ inline int getSize() const {
         return nn;
     }
 
@@ -360,8 +386,7 @@ public:
 
         int pos = -sumOfOffset;
         for (int i = 0; i < sizeof...(index); i++) {
-            if(!(offset[i] <= idx[i] && idx[i] <= offset[i] + this->sizes[i] - 1)) {
-                printf("Index out of bounds\n");
+            if (!(offset[i] <= idx[i] && idx[i] <= offset[i] + this->sizes[i] - 1)) {
                 JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
             }
 
@@ -435,7 +460,7 @@ public:
         return array;
     }
 
-    inline JICudaArray<T, RANK>& operator=(const std::initializer_list<T>& list) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator=(const std::initializer_list<T>& list) {
         JIARRAY_CHECK_SIZE(this->nn, list.size());
         int idx = 0;
         for (const T& val : list) {
@@ -444,7 +469,7 @@ public:
         return *this;
     }
 
-    inline JICudaArray<T, RANK>& operator=(const T& val) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator=(const T& val) {
         assert(nn > 0);
         for (int i = 0; i < nn; ++i) {
             mm[i] = val;
@@ -453,8 +478,36 @@ public:
         return *this;
     }
 
-    template <typename T2>
-    inline JICudaArray<T, RANK>& operator=(const std::vector<T2>& val) {
+    template <typename InputContainer,
+              typename = decltype(std::begin(std::declval<const InputContainer&>())),
+              typename = decltype(std::end(std::declval<const InputContainer&>()))>
+    inline JICudaArray<T, RANK>& operator=(const InputContainer& val) {
+        using std::begin;
+        using std::end;
+
+        auto first = begin(val);
+        auto last  = end(val);
+
+        size_t container_size = std::distance(first, last);
+
+        if (nn == 0) {
+            int size[RANK];
+            std::fill(size, size + RANK, 1);
+            size[RANK - 1] = container_size;
+            init(size);
+        } else {
+            JIARRAY_CHECK_SIZE(nn, container_size);
+        }
+
+        int i = 0;
+        for (auto it = first; it != last; ++it, ++i) {
+            mm[i] = *it;
+        }
+
+        return *this;
+    }
+
+    inline JICudaArray<T, RANK>& operator=(const std::vector<T>& val) {
         if (nn == 0) {
             int size[RANK];
             std::fill(size, size + RANK, 1);
@@ -464,14 +517,33 @@ public:
             JIARRAY_CHECK_SIZE(nn, val.size());
         }
 
-        for (int i = 0; i < nn; ++i) {
-            mm[i] = val[i];
+        int i = -1;
+        for (auto& v : val) {
+            mm[++i] = v;
         }
 
         return *this;
     }
 
-    inline JICudaArray<T, RANK>& operator=(const T* array) {
+    inline JICudaArray<T, RANK>& operator=(const std::set<T>& val) {
+        if (nn == 0) {
+            int size[RANK];
+            std::fill(size, size + RANK, 1);
+            size[RANK - 1] = val.size();
+            init(size);
+        } else {
+            JIARRAY_CHECK_SIZE(nn, val.size());
+        }
+
+        int i = -1;
+        for (auto& v : val) {
+            mm[++i] = v;
+        }
+
+        return *this;
+    }
+
+    __host__ __device__ inline JICudaArray<T, RANK>& operator=(const T* array) {
         assert(nn > 0);
 
         for (int i = 0; i < nn; ++i) {
@@ -481,73 +553,74 @@ public:
         return *this;
     }
 
-    inline JICudaArray<T, RANK>& operator=(const JICudaArray<T, RANK>& array) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator=(const JICudaArray<T, RANK>& array) {
+
         if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
             initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-
         } else {
-            // #ifdef JIARRAY_DEBUG
             JIARRAY_CHECK_SIZE(nn, array.getSize());
-
             auto arraySizeOfRank = array.getSizeOfRank();
             auto arrayOffset     = array.getOffset();
             for (int rank = 0; rank < RANK; ++rank) {
                 assert(this->sizes[rank] == arraySizeOfRank[rank]);
                 assert(offset[rank] == arrayOffset[rank]);
             }
-            // #endif
         }
 
         auto arrayMemory = array.data();
-        std::copy(arrayMemory, arrayMemory + nn, mm);
+        for (int i = 0; i < nn; ++i) {
+            mm[i] = arrayMemory[i];
+        }
 
         return *this;
     }
 
-    template <typename T2>
-    inline JICudaArray<T, RANK>& operator=(const JIArray<T2, RANK>& array) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator=(const JIArray<T, RANK>& array) {
         if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
             initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-
         } else {
-            // #ifdef JIARRAY_DEBUG
             JIARRAY_CHECK_SIZE(nn, array.getSize());
-
             auto arraySizeOfRank = array.getSizeOfRank();
             auto arrayOffset     = array.getOffset();
             for (int rank = 0; rank < RANK; ++rank) {
                 assert(this->sizes[rank] == arraySizeOfRank[rank]);
                 assert(offset[rank] == arrayOffset[rank]);
             }
-            // #endif
         }
 
         auto arrayMemory = array.data();
-        std::copy(arrayMemory, arrayMemory + nn, mm);
+
+        for (int i = 0; i < nn; ++i) {
+            mm[i] = arrayMemory[i];
+        }
 
         return *this;
     }
 
-    inline bool operator==(const JICudaArray<T, RANK>& array) const {
+    __host__ __device__ inline bool operator==(const JICudaArray<T, RANK>& array) const {
         if (nn != array.nn)
             return false;
 
         for (int i = 0; i < nn; ++i) {
-            if (array.mm[i] != this->mm[i])
+            if (! (array.mm[i] == this->mm[i]))
                 return false;
         }
 
         return true;
     }
 
-    inline JICudaArray<T, RANK>& operator+=(const T& val) {
+    __host__ __device__ inline bool operator!=(const JICudaArray<T, RANK>& array) const {
+        return !(*this == array);
+    }
+
+    __host__ __device__ inline JICudaArray<T, RANK>& operator+=(const T& val) {
         for (int i = 0; i < nn; ++i) {
             this->mm[i] += val;
         }
         return *this;
     }
 
-    inline JICudaArray<T, RANK> operator+=(const JICudaArray<T, RANK>& array) {
+    __host__ __device__ inline JICudaArray<T, RANK> operator+=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
 
         for (int i = 0; i < nn; ++i) {
@@ -576,7 +649,7 @@ public:
         return out;
     }
 
-    inline JICudaArray<T, RANK>& operator-=(const JICudaArray<T, RANK>& array) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator-=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         for (int i = 0; i < nn; ++i) {
             mm[i] -= array.mm[i];
@@ -623,14 +696,14 @@ public:
         return out;
     }
 
-    inline JICudaArray<T, RANK>& operator*=(const T& val) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator*=(const T& val) {
         for (int i = 0; i < nn; ++i) {
             this->mm[i] *= val;
         }
         return *this;
     }
 
-    inline JICudaArray<T, RANK>& operator*=(const JICudaArray<T, RANK>& array) {
+    __host__ __device__ inline JICudaArray<T, RANK>& operator*=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
 
         for (int i = 0; i < nn; ++i) {
@@ -660,14 +733,14 @@ public:
         return result;
     }
 
-    inline void operator/=(const T& val) {
+    __host__ __device__ inline void operator/=(const T& val) {
         auto rval = 1.0 / val;
         for (int i = 0; i < nn; ++i) {
             mm[i] *= rval;
         }
     }
 
-    inline JICudaArray<T, RANK> operator/=(const JICudaArray<T, RANK>& array) {
+    __host__ __device__ inline JICudaArray<T, RANK> operator/=(const JICudaArray<T, RANK>& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
 
         for (int i = 0; i < nn; ++i) {
@@ -695,13 +768,17 @@ public:
         return out;
     }
 
-    inline double sqsum() const {
+    __host__ __device__ inline double sqsum() const {
         double result = 0;
         for (int i = 0; i < nn; ++i) {
             result += mm[i] * mm[i];
         }
 
         return result;
+    }
+
+    void flush(int deviceId) const {
+        cudaMemPrefetchAsync(mm, nn * sizeof(T), deviceId);
     }
 
     inline JICudaArray<T, RANK> copy() const {
@@ -776,7 +853,7 @@ public:
         return result;
     }
 
-    friend inline T dot(const JICudaArray<T, RANK>& array1, const JICudaArray<T, RANK>& array2) {
+    __host__ __device__ friend inline T dot(const JICudaArray<T, RANK>& array1, const JICudaArray<T, RANK>& array2) {
         // #ifdef JIARRAY_DEBUG
         for (int rank = 0; rank < RANK; ++rank) {
             assert(array1.sizes[rank] == array2.sizes[rank]);
@@ -792,7 +869,7 @@ public:
         return result;
     }
 
-    inline bool contains(const T& item) const {
+    __host__ __device__ inline bool contains(const T& item) const {
         for (int i = 0; i < nn; ++i) {
             if (mm[i] == item)
                 return true;
@@ -800,7 +877,7 @@ public:
         return false;
     }
 
-    inline FastArray<int, RANK> findFirst(const T& item) const {
+    __host__ __device__ inline FastArray<int, RANK> findFirst(const T& item) const {
         int loc = -1;
         T   value;
         for (int i = 0; i < this->nn; ++i) {
@@ -830,7 +907,7 @@ public:
         return location;
     }
 
-    inline FastArray<int, RANK> maxloc() {
+    __host__ __device__ inline FastArray<int, RANK> maxloc() {
         int maxloc = 0;
         T   maxval = mm[0];
         for (int i = 1; i < this->nn; ++i) {
@@ -855,7 +932,7 @@ public:
         return maxLocation;
     }
 
-    inline FastArray<int, RANK> maxloc(int from, int to) {
+    __host__ __device__ inline FastArray<int, RANK> maxloc(int from, int to) {
         int maxloc = 0;
         T   maxval = mm[from - JIARRAY_OFFSET];
         for (int i = from - JIARRAY_OFFSET + 1; i < to - JIARRAY_OFFSET; ++i) {
@@ -890,6 +967,10 @@ public:
         // #endif
     }
 
+    __host__ __device__ inline const T& back() const {
+        return mm[nn - 1];
+    }
+
     struct Iterator {
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
@@ -897,108 +978,107 @@ public:
         using pointer           = T*; // or also value_type*
         using reference         = T&; // or also value_type&
 
-        Iterator(pointer ptr)
-            : m_ptr(ptr) {};
+        __host__ __device__ Iterator(pointer ptr) : m_ptr(ptr) {};
 
-        Iterator operator+(difference_type n) const {
+        __host__ __device__ inline Iterator operator+(difference_type n) const {
             return Iterator(m_ptr + n);
         }
 
-        Iterator operator-(difference_type n) const {
+        __host__ __device__ inline Iterator operator-(difference_type n) const {
             return Iterator(m_ptr - n);
         }
 
-        Iterator& operator+=(difference_type n) {
+        __host__ __device__ inline Iterator& operator+=(difference_type n) {
             m_ptr += n;
             return *this;
         }
 
-        Iterator& operator-=(difference_type n) {
+        __host__ __device__ inline Iterator& operator-=(difference_type n) {
             m_ptr -= n;
             return *this;
         }
 
-        T& operator[](difference_type n) {
+        __host__ __device__ inline T& operator[](difference_type n) {
             return *(m_ptr + n);
         }
 
-        const T& operator[](difference_type n) const {
+        __host__ __device__ inline const T& operator[](difference_type n) const {
             return *(m_ptr + n);
         }
 
-        difference_type operator-(const Iterator& other) const {
+        __host__ __device__ inline difference_type operator-(const Iterator& other) const {
             return m_ptr - other.m_ptr;
         }
 
-        bool operator<(const Iterator& other) const {
+        __host__ __device__ inline bool operator<(const Iterator& other) const {
             return m_ptr < other.m_ptr;
         }
-        bool operator<=(const Iterator& other) const {
+        __host__ __device__ inline bool operator<=(const Iterator& other) const {
             return m_ptr <= other.m_ptr;
         }
-        bool operator>(const Iterator& other) const {
+        __host__ __device__ inline bool operator>(const Iterator& other) const {
             return m_ptr > other.m_ptr;
         }
-        bool operator>=(const Iterator& other) const {
+        __host__ __device__ inline bool operator>=(const Iterator& other) const {
             return m_ptr >= other.m_ptr;
         }
 
-        reference operator*() {
+        __host__ __device__ inline reference operator*() {
             return *m_ptr;
         }
 
-        reference operator*() const {
+        __host__ __device__ inline reference operator*() const {
             return *m_ptr;
         }
 
-        pointer operator->() {
+        __host__ __device__ inline pointer operator->() {
             return m_ptr;
         }
 
-        const pointer operator->() const {
+        __host__ __device__ inline const pointer operator->() const {
             return m_ptr;
         }
 
         // Prefix increment
-        Iterator& operator++() {
+        __host__ __device__ inline Iterator& operator++() {
             m_ptr++;
             return *this;
         }
 
         // Postfix increment
-        Iterator operator++(int) {
+        __host__ __device__ inline Iterator operator++(int) {
             Iterator tmp = *this;
             ++(*this);
             return tmp;
         }
 
-        const Iterator operator++(int) const {
+        __host__ __device__ inline const Iterator operator++(int) const {
             Iterator tmp = *this;
             ++(*this);
             return tmp;
         }
 
-        Iterator& operator--() {
+        __host__ __device__ inline Iterator& operator--() {
             --m_ptr;
             return *this;
         }
 
-        Iterator operator--(int) {
+        __host__ __device__ inline Iterator operator--(int) {
             Iterator temp = *this;
             --(*this);
             return temp;
         }
 
-        const Iterator operator--(int) const {
+        __host__ __device__ inline const Iterator operator--(int) const {
             Iterator temp = *this;
             --(*this);
             return temp;
         }
 
-        friend bool operator==(const Iterator& a, const Iterator& b) {
+        __host__ __device__ inline friend bool operator==(const Iterator& a, const Iterator& b) {
             return a.m_ptr == b.m_ptr;
         }
-        friend bool operator!=(const Iterator& a, const Iterator& b) {
+        __host__ __device__ inline friend bool operator!=(const Iterator& a, const Iterator& b) {
             return a.m_ptr != b.m_ptr;
         }
 
@@ -1007,17 +1087,17 @@ public:
     };
 
 public:
-    Iterator begin() {
+    __host__ __device__ inline Iterator begin() {
         return Iterator(mm);
     }
-    Iterator end() {
+    __host__ __device__ inline Iterator end() {
         return Iterator(mm + nn);
     } // 200 is out of bounds
 
-    const Iterator begin() const {
+    __host__ __device__ inline const Iterator begin() const {
         return Iterator(mm);
     }
-    const Iterator end() const {
+    __host__ __device__ inline const Iterator end() const {
         return Iterator(mm + nn);
     } // 200 is out of bounds
 
@@ -1026,6 +1106,41 @@ public:
         std::vector<T> vec(mm, mm + nn);
         return vec;
     }
+
+#ifdef JIARRAY_CEREAL
+public:
+    template <class Archive>
+    void serialize(Archive& ar) {
+
+        if constexpr (std::is_pointer_v<T>) {
+            assert("JIArray does not support serialization for pointer types" && false);
+        }
+
+        if constexpr (Archive::is_loading::value) {
+            if (allocated == JIARRAY_ALLOCATED_ALL) {
+                destroy();
+            }
+        }
+        
+        ar(nn, rankSize, offset, sumOfOffset, sizes, allocated);
+
+        if constexpr (Archive::is_saving::value) {
+            if (nn == 0) return;
+        }
+
+        if constexpr (Archive::is_loading::value) {
+            cudaMallocManaged(&mm, nn * sizeof(T));
+        }
+
+        if constexpr (std::is_arithmetic_v<T>) {
+            ar(cereal::binary_data(mm, nn * sizeof(T)));
+        } else {
+            for (size_t i = 0; i < nn; i++) {
+                ar(mm[i]);
+            }
+        }
+    }
+#endif
 };
 
 #define cbool1   JICudaArray<bool, 1>

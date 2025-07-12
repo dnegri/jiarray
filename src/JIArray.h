@@ -5,6 +5,10 @@
 #include <numeric>
 #include <vector>
 
+#ifdef JIARRAY_CEREAL
+    #include <cereal/archives/binary.hpp>
+#endif
+
 namespace dnegri::jiarray {
 
 template <class T, std::size_t RANK = 1, class = std::make_index_sequence<RANK>>
@@ -26,15 +30,15 @@ private:
     // #endif
 
 public:
-    __host__ __device__ JIArray() {
+    JIArray() {
     }
 
-    __host__ __device__ JIArray(std::initializer_list<T> il)
+    JIArray(std::initializer_list<T> il)
         : JIArray(il.size()) {
         std::copy(il.begin(), il.end(), mm);
     }
 
-    __host__ __device__ JIArray(const JIArray<T, RANK>& array) {
+    JIArray(const JIArray<T, RANK>& array) {
         nn = array.nn;
         mm = array.mm;
         std::copy((int*)array.rankSize, ((int*)array.rankSize) + RANK, rankSize);
@@ -47,22 +51,22 @@ public:
         // #endif
     }
 
-    __host__ __device__ virtual ~JIArray() {
+    virtual ~JIArray() {
         destroy();
     }
 
     template <typename... Args,
               typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>>
-    __host__ __device__ JIArray(Args... args) {
+    JIArray(Args... args) {
         init(args...);
     }
 
-    __host__ __device__ JIArray(T* memory_, decltype(INTS)... args) {
+    JIArray(T* memory_, decltype(INTS)... args) {
         init(args..., memory_);
     }
 
     template <typename... INTS2, typename = std::enable_if_t<(sizeof...(INTS2) == 2 * RANK)>>
-    __host__ __device__ void init0(INTS2... array_sizes) {
+    void init0(INTS2... array_sizes) {
         int temp_size[] = {static_cast<int>(array_sizes)...};
 
         int sizes[RANK];
@@ -80,12 +84,12 @@ public:
     template <typename... Args,
               typename = std::enable_if_t<(std::is_integral_v<Args> && ...)>,
               typename = std::enable_if_t<(sizeof...(Args) == RANK)>>
-              __host__ __device__ void init(Args... array_sizes) {
+    void init(Args... array_sizes) {
         int sizes[] = {static_cast<int>(array_sizes)...};
         init(sizes);
     }
 
-    __host__ __device__ void init(int sizes[RANK]) {
+    void init(int sizes[RANK]) {
         destroy();
 
         for (int i = 0; i < RANK; i++) {
@@ -117,7 +121,7 @@ public:
         // #endif
     }
 
-    __host__ __device__ void initByRankSize(int size, const int* rankSizes, const int* offsets, T* memory) {
+    void initByRankSize(int size, const int* rankSizes, const int* offsets, T* memory) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
         nn = size;
@@ -142,7 +146,7 @@ public:
         // #endif
     }
 
-    __host__ __device__ void initByRankSize(int size, const int* rankSizes, const int* offsets) {
+    void initByRankSize(int size, const int* rankSizes, const int* offsets) {
         destroy();
         if (size == 0) return;
 
@@ -151,7 +155,7 @@ public:
         allocated = JIARRAY_ALLOCATED_ALL;
     }
 
-    __host__ __device__ void init(decltype(INTS)... array_sizes, T* memory_) {
+    void init(decltype(INTS)... array_sizes, T* memory_) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
         nn = (array_sizes * ...);
@@ -177,7 +181,7 @@ public:
         // #endif
     }
 
-    __host__ __device__ void destroy() {
+    void destroy() {
         if (allocated != JIARRAY_ALLOCATED_NONE) {
             if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && mm != nullptr) {
                 delete[] mm;
@@ -188,7 +192,7 @@ public:
         }
     }
 
-    __host__ __device__ void erase() {
+    void erase() {
         destroy();
         std::fill(rankSize, rankSize + RANK, 0);
         std::fill(offset, offset + RANK, 0);
@@ -215,24 +219,20 @@ public:
             sumOfOffset += rankSize[i] * offset[i];
     }
 
-    __host__ __device__ void setSize(decltype(INTS)... array_sizes) {
+    void setSize(decltype(INTS)... array_sizes) {
         size_t sizes[] = {static_cast<size_t>(array_sizes)...};
 
         bool same = true;
 
-        int newRankSize[RANK]{};
-
-        newRankSize[0] = 1;
-        for (int i = 1; i < RANK; i++) {
-            newRankSize[i] = newRankSize[i - 1] * sizes[i - 1];
-            if (newRankSize[i] != rankSize[i]) {
+        for (int i = 0; i < RANK; i++) {
+            if (this->sizes[i] != sizes[i]) {
                 same = false;
                 break;
             }
         }
 
         if (same) return;
-
+        
         destroy();
         init(array_sizes...);
     }
@@ -279,6 +279,10 @@ public:
 
     __host__ __device__ inline const int& size() const {
         return nn;
+    }
+
+    inline const T& back() const {
+        return mm[nn - 1];
     }
 
     __host__ __device__ inline T average() const {
@@ -363,7 +367,6 @@ public:
     __host__ __device__ inline T& operator[](size_t index) {
         return at(index);
     }
-
 
     __host__ __device__ inline const T& operator()(decltype(INTS)... index) const {
         return at(index...);
@@ -489,11 +492,15 @@ public:
             return false;
 
         for (int i = 0; i < nn; ++i) {
-            if (array.mm[i] != this->mm[i])
+            if ((array.mm[i] == this->mm[i]) == false)
                 return false;
         }
 
         return true;
+    }
+
+    __host__ __device__ inline bool operator!=(const JIArray<T, RANK>& array) const {
+        return !(*this == array);
     }
 
     __host__ __device__ inline JIArray<T, RANK>& operator+=(const T& val) {
@@ -688,7 +695,7 @@ public:
 
     template <typename Scalar,
               typename = std::enable_if_t<std::is_arithmetic<Scalar>::value>>
-              __host__ __device__ friend inline JIArray<T, RANK> operator*(const Scalar& val, const JIArray<T, RANK>& array) {
+    __host__ __device__ friend inline JIArray<T, RANK> operator*(const Scalar& val, const JIArray<T, RANK>& array) {
         JIArray<T, RANK> result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
 
@@ -856,105 +863,105 @@ public:
         Iterator(pointer ptr)
             : m_ptr(ptr) {};
 
-        Iterator operator+(difference_type n) const {
+        __host__ __device__ Iterator operator+(difference_type n) const {
             return Iterator(m_ptr + n);
         }
 
-        Iterator operator-(difference_type n) const {
+        __host__ __device__ Iterator operator-(difference_type n) const {
             return Iterator(m_ptr - n);
         }
 
-        Iterator& operator+=(difference_type n) {
+        __host__ __device__ Iterator& operator+=(difference_type n) {
             m_ptr += n;
             return *this;
         }
 
-        Iterator& operator-=(difference_type n) {
+        __host__ __device__ Iterator& operator-=(difference_type n) {
             m_ptr -= n;
             return *this;
         }
 
-        T& operator[](difference_type n) {
+        __host__ __device__ T& operator[](difference_type n) {
             return *(m_ptr + n);
         }
 
-        const T& operator[](difference_type n) const {
+        __host__ __device__ const T& operator[](difference_type n) const {
             return *(m_ptr + n);
         }
 
-        difference_type operator-(const Iterator& other) const {
+        __host__ __device__ difference_type operator-(const Iterator& other) const {
             return m_ptr - other.m_ptr;
         }
 
-        bool operator<(const Iterator& other) const {
+        __host__ __device__ bool operator<(const Iterator& other) const {
             return m_ptr < other.m_ptr;
         }
-        bool operator<=(const Iterator& other) const {
+        __host__ __device__ bool operator<=(const Iterator& other) const {
             return m_ptr <= other.m_ptr;
         }
-        bool operator>(const Iterator& other) const {
+        __host__ __device__ bool operator>(const Iterator& other) const {
             return m_ptr > other.m_ptr;
         }
-        bool operator>=(const Iterator& other) const {
+        __host__ __device__ bool operator>=(const Iterator& other) const {
             return m_ptr >= other.m_ptr;
         }
 
-        reference operator*() {
+        __host__ __device__ reference operator*() {
             return *m_ptr;
         }
 
-        reference operator*() const {
+        __host__ __device__ reference operator*() const {
             return *m_ptr;
         }
 
-        pointer operator->() {
+        __host__ __device__ pointer operator->() {
             return m_ptr;
         }
 
-        const pointer operator->() const {
+        __host__ __device__ const pointer operator->() const {
             return m_ptr;
         }
 
         // Prefix increment
-        Iterator& operator++() {
+        __host__ __device__ Iterator& operator++() {
             m_ptr++;
             return *this;
         }
 
         // Postfix increment
-        Iterator operator++(int) {
+        __host__ __device__ Iterator operator++(int) {
             Iterator tmp = *this;
             ++(*this);
             return tmp;
         }
 
-        const Iterator operator++(int) const {
+        __host__ __device__ const Iterator operator++(int) const {
             Iterator tmp = *this;
             ++(*this);
             return tmp;
         }
 
-        Iterator& operator--() {
+        __host__ __device__ Iterator& operator--() {
             --m_ptr;
             return *this;
         }
 
-        Iterator operator--(int) {
+        __host__ __device__ Iterator operator--(int) {
             Iterator temp = *this;
             --(*this);
             return temp;
         }
 
-        const Iterator operator--(int) const {
+        __host__ __device__ const Iterator operator--(int) const {
             Iterator temp = *this;
             --(*this);
             return temp;
         }
 
-        friend bool operator==(const Iterator& a, const Iterator& b) {
+        __host__ __device__ friend bool operator==(const Iterator& a, const Iterator& b) {
             return a.m_ptr == b.m_ptr;
         }
-        friend bool operator!=(const Iterator& a, const Iterator& b) {
+        __host__ __device__ friend bool operator!=(const Iterator& a, const Iterator& b) {
             return a.m_ptr != b.m_ptr;
         }
 
@@ -963,25 +970,59 @@ public:
     };
 
 public:
-    Iterator begin() {
+    __host__ __device__ Iterator begin() {
         return Iterator(mm);
     }
-    Iterator end() {
+    __host__ __device__ Iterator end() {
         return Iterator(mm + nn);
-    } // 200 is out of bounds
+    }
 
-    const Iterator begin() const {
+    __host__ __device__ const Iterator begin() const {
         return Iterator(mm);
     }
-    const Iterator end() const {
+    __host__ __device__ const Iterator end() const {
         return Iterator(mm + nn);
-    } // 200 is out of bounds
+    }
 
 public:
-    std::vector<T> convertToVector() {
+    __host__ __device__ std::vector<T> convertToVector() {
         std::vector<T> vec(mm, mm + nn);
         return vec;
     }
+
+#ifdef JIARRAY_CEREAL
+public:
+    template <class Archive>
+    void serialize(Archive& ar) {
+        if constexpr (std::is_pointer_v<T>) {
+            assert("JIArray does not support serialization for pointer types" && false);
+        }
+
+        if constexpr (Archive::is_loading::value) {
+            if (allocated == JIARRAY_ALLOCATED_ALL) {
+                destroy();
+            }
+        }
+
+        ar(nn, rankSize, offset, sumOfOffset, sizes, allocated);
+
+        if constexpr (Archive::is_saving::value) {
+            if(nn == 0) return;    
+        }
+
+        if constexpr (Archive::is_loading::value) {
+            mm = new T[nn]{};
+        }
+
+        if constexpr (std::is_arithmetic_v<T>) {
+            ar(cereal::binary_data(mm, nn * sizeof(T)));
+        } else {
+            for (size_t i = 0; i < nn; i++) {
+                ar(mm[i]);
+            }
+        }
+    }
+#endif
 };
 
 #define zbool1   JIArray<bool, 1>

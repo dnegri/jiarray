@@ -1,6 +1,9 @@
 #pragma once
 
 #include "pch.h"
+#ifdef JIARRAY_CEREAL
+    #include <cereal/archives/binary.hpp>
+#endif
 
 namespace dnegri::jiarray {
 
@@ -77,7 +80,7 @@ public:
     __host__ __device__ inline const T& operator[](int i) const {
         JIARRAY_CHECK_BOUND(i, OFFSET, OFFSET + SIZE - 1);
         return mm[i - OFFSET];
-    }    
+    }
     inline FastArray<T, SIZE, OFFSET>& operator=(const FastArray<T, SIZE, OFFSET>& array) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = array.mm[i];
@@ -90,6 +93,21 @@ public:
         }
         return *this;
     }
+
+    inline bool operator==(const FastArray<T, SIZE, OFFSET>& array) const {
+        for (size_t i = 0; i < SIZE; i++) {
+            if (mm[i] != array.mm[i]) return false;
+        }
+        return true;
+    }
+
+#ifdef JIARRAY_CEREAL
+public:
+    template <class Archive>
+    void serialize(Archive& ar) {
+        ar(mm);
+    }
+#endif
 };
 
 template <class T, std::size_t SIZE1, std::size_t SIZE2, std::size_t OFFSET = JIARRAY_OFFSET>

@@ -27,6 +27,10 @@ public:
         : Base(vec) {
     }
 
+    JIVector(size_t size, const _Tp& value = _Tp())
+        : Base(size, value) {
+    }
+
     // Accessors with custom offset
     reference operator[](int index) {
         return Base::operator[](index - JIARRAY_OFFSET);
@@ -55,7 +59,7 @@ public:
     _Tp sum() const {
         return std::accumulate(Base::begin(), Base::end(), 0.0);
     }
-    
+
     iterator begin() {
         return Base::begin();
     }
@@ -104,9 +108,21 @@ public:
         }
     }
 
+    int count(const _Tp& value) const {
+        return std::count(Base::begin(), Base::end(), value);
+    }
+
     // Contains method
     bool contains(const _Tp& value) const {
         return std::find(Base::begin(), Base::end(), value) != Base::end();
+    }
+
+    int index(const _Tp& value) const {
+        auto it = std::find(Base::begin(), Base::end(), value);
+        if (it != Base::end()) {
+            return std::distance(Base::begin(), it) + JIARRAY_OFFSET;
+        }
+        return -1 + JIARRAY_OFFSET; // Not found
     }
 
     // Insert methods

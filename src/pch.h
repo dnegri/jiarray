@@ -11,9 +11,12 @@
 #include <utility>
 #include <vector>
 
-#ifndef __CUDACC__
+#ifdef __CUDACC__
+    #define __hd__ __host__ __device__
+#else
     #define __host__ 
     #define __device__
+    #define __hd__
 #endif    
 
 namespace dnegri::jiarray {
