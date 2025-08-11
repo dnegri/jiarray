@@ -93,6 +93,14 @@ public:
         return std::find(Base::begin(), Base::end(), value) != Base::end();
     }
 
+    int find(const _Tp& value) const {
+        auto it = std::find(Base::begin(), Base::end(), value);
+        if (it != Base::end()) {
+            return std::distance(Base::begin(), it) + JIARRAY_OFFSET;
+        }
+        return JIARRAY_OFFSET - 1; // Not found
+    }
+
     // Insert methods
     void insert(const_iterator iter, std::initializer_list<_Tp> il) {
         Base::insert(iter, il);

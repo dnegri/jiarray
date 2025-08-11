@@ -5,7 +5,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(GTest)
-
+option(BUILD_SUBPROJECT_TESTS "Build subproject tests" ON)
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG -DJIARRAY_DEBUG ${CMAKE_CXX_FLAGS_DEBUG}")
@@ -17,7 +17,7 @@ file(GLOB SOURCES ./test/simple_test.cpp ./test/slice_test.cpp)
 
 add_executable(${PROJECT_NAME} ./test/iter_test.cpp  ./test/range_test.cpp ./test/main.cpp)
 
-if(GTest_FOUND)
+if(GTest_FOUND AND BUILD_SUBPROJECT_TESTS)
   enable_testing()
 
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}  -DJIARRAY_DEBUG")

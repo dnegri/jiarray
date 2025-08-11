@@ -432,8 +432,9 @@ public:
             JIARRAY_CHECK_SIZE(nn, val.size());
         }
 
-        for (int i = 0; i < nn; ++i) {
-            mm[i] = val[i];
+        int i = -1;
+        for (auto& v : val) {
+            mm[++i] = v;
         }
 
         return *this;
@@ -744,34 +745,41 @@ public:
         return false;
     }
 
-    inline FastArray<int, RANK> findFirst(const T& item) const {
-        int loc = -1;
-        T   value;
-        for (int i = 0; i < this->nn; ++i) {
-            if (mm[i] == item) {
-                loc   = i;
-                value = mm[i];
-                break;
+    inline auto findFirst(const T& item) const {
+        if constexpr (RANK == 1) {
+            for (int i = 0; i < this->nn; ++i) {
+                if (mm[i] == item) {
+                    return i + offset[0];
+                }
             }
-        }
+            return (-1 + JIARRAY_OFFSET);
+        } else {
+            int loc = -1;
+            for (int i = 0; i < this->nn; ++i) {
+                if (mm[i] == item) {
+                    loc = i;
+                    break;
+                }
+            }
 
-        FastArray<int, RANK> location;
-        location = (-1 + JIARRAY_OFFSET);
+            FastArray<int, RANK> location;
+            location = (-1 + JIARRAY_OFFSET);
 
-        if (loc == -1)
+            if (loc == -1)
+                return location;
+
+            for (int rank = RANK - 1; rank > 0; --rank) {
+                location.mm[rank] = loc / rankSize[rank];
+                loc -= (location.mm[rank]) * rankSize[rank];
+            }
+            location.mm[0] = loc;
+
+            for (int rank = 0; rank < RANK; ++rank) {
+                location.mm[rank] += offset[rank];
+            }
+
             return location;
-
-        for (int rank = RANK - 1; rank > 0; --rank) {
-            location.mm[rank] = loc / rankSize[rank];
-            loc -= (location.mm[rank]) * rankSize[rank];
         }
-        location.mm[0] = loc;
-
-        for (int rank = 0; rank < RANK; ++rank) {
-            location.mm[rank] += offset[rank];
-        }
-
-        return location;
     }
 
     inline FastArray<int, RANK> maxloc() {
