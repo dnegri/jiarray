@@ -7,9 +7,9 @@
 
 namespace dnegri::jiarray {
 
-template <class T, int RANK = 1, class = std::make_index_sequence<RANK>> class JIArray;
+template <class T, size_t RANK = 1, class = std::make_index_sequence<RANK>> class JIArray;
 
-template <class T, int RANK, int... INTS> class JIArray<T, RANK, std::index_sequence<INTS...>> {
+template <class T, size_t RANK, size_t... INTS> class JIArray<T, RANK, std::index_sequence<INTS...>> {
   private:
     constexpr static bool is_row_major = (JIARRAY_COLUMN_MAJOR == 0);
 
@@ -41,7 +41,7 @@ template <class T, int RANK, int... INTS> class JIArray<T, RANK, std::index_sequ
         if constexpr (is_row_major) {
             // Row-major: rightmost dimension has stride 1
             rankSize[RANK - 1] = 1;
-            for (int i = RANK - 2; i >= 0; i--) {
+            for (int i = (int)RANK - 2; i >= 0; i--) {
                 rankSize[i] = rankSize[i + 1] * dimensions[i + 1];
             }
         } else {
