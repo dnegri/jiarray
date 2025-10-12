@@ -4,6 +4,11 @@ project(dnegri.jiarray C CXX)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
 
+add_library(jiarray INTERFACE)
+target_include_directories(jiarray INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
 if(PROJECT_IS_TOP_LEVEL)
   find_package(GTest)
 
