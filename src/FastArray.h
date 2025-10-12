@@ -84,6 +84,14 @@ public:
         }
         return *this;
     }
+
+    inline FastArray<T, SIZE, OFFSET>& operator=(const T* val) {
+        for (size_t i = 0; i < SIZE; i++) {
+            mm[i] = val[i];
+        }
+        return *this;
+    }
+
     inline FastArray<T, SIZE, OFFSET>& operator=(const T& val) {
         for (size_t i = 0; i < SIZE; i++) {
             mm[i] = val;
@@ -118,6 +126,100 @@ public:
             result.mm[i] *= val;
         }
         return result;
+    }
+
+    // ========== Iterator support ==========
+    using value_type             = T;
+    using size_type              = std::size_t;
+    using difference_type        = std::ptrdiff_t;
+    using reference              = T&;
+    using const_reference        = const T&;
+    using pointer                = T*;
+    using const_pointer          = const T*;
+    using iterator               = T*;
+    using const_iterator         = const T*;
+    using reverse_iterator       = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+    // Iterator functions
+    iterator begin() noexcept {
+        return mm;
+    }
+    const_iterator begin() const noexcept {
+        return mm;
+    }
+    const_iterator cbegin() const noexcept {
+        return mm;
+    }
+
+    iterator end() noexcept {
+        return mm + SIZE;
+    }
+    const_iterator end() const noexcept {
+        return mm + SIZE;
+    }
+    const_iterator cend() const noexcept {
+        return mm + SIZE;
+    }
+
+    reverse_iterator rbegin() noexcept {
+        return reverse_iterator(end());
+    }
+    const_reverse_iterator rbegin() const noexcept {
+        return const_reverse_iterator(end());
+    }
+    const_reverse_iterator crbegin() const noexcept {
+        return const_reverse_iterator(end());
+    }
+
+    reverse_iterator rend() noexcept {
+        return reverse_iterator(begin());
+    }
+    const_reverse_iterator rend() const noexcept {
+        return const_reverse_iterator(begin());
+    }
+    const_reverse_iterator crend() const noexcept {
+        return const_reverse_iterator(begin());
+    }
+
+    // Size functions
+    constexpr size_type size() const noexcept {
+        return SIZE;
+    }
+    constexpr size_type max_size() const noexcept {
+        return SIZE;
+    }
+    constexpr bool empty() const noexcept {
+        return SIZE == 0;
+    }
+
+    // Element access (0-based, for STL compatibility)
+    reference operator[](size_type i) noexcept {
+        return mm[i];
+    }
+    const_reference operator[](size_type i) const noexcept {
+        return mm[i];
+    }
+
+    reference front() noexcept {
+        return mm[0];
+    }
+    const_reference front() const noexcept {
+        return mm[0];
+    }
+
+    reference back() noexcept {
+        return mm[SIZE - 1];
+    }
+    const_reference back() const noexcept {
+        return mm[SIZE - 1];
+    }
+
+    pointer data() noexcept {
+        return mm;
+    }
+    const_pointer data() const noexcept {
+        return mm;
     }
 };
 
