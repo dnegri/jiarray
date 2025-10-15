@@ -218,7 +218,7 @@ private:
      * @note Uses manual loop unrolling for small ranks (≤ 4) for better performance
      */
     template <typename... Args>
-    [[nodiscard]] inline int calculateIndex(Args... indices) const {
+    inline int calculateIndex(Args... indices) const {
         static_assert(sizeof...(indices) == RANK, "Number of indices must match array rank");
         static_assert(all_integral_v<Args...>, "All indices must be integral types");
 
@@ -277,7 +277,7 @@ private:
      * @return Memory offset for the sliced subarray
      */
     template <typename... INDEX>
-    [[nodiscard]] inline int calculateSliceOffset(INDEX... index) const {
+    inline int calculateSliceOffset(INDEX... index) const {
         constexpr int num_idx = sizeof...(INDEX);
         static_assert(num_idx < RANK, "Slice indices must be less than array rank");
 
@@ -644,7 +644,7 @@ public:
      * @endcode
      */
     template <typename... INDEX>
-    [[nodiscard]] inline JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) {
+    inline JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) {
         constexpr int RANK2 = RANK - sizeof...(INDEX);
         static_assert(RANK2 > 0, "Slice rank must be at least 1");
         static_assert(sizeof...(INDEX) < RANK, "Number of slice indices must be less than rank");
@@ -670,7 +670,7 @@ public:
      * @note Returns a const view that prevents modification of the original data
      */
     template <typename... INDEX>
-    [[nodiscard]] inline const JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
+    inline const JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
         constexpr int RANK2 = RANK - sizeof...(INDEX);
         static_assert(RANK2 > 0, "Slice rank must be at least 1");
         static_assert(sizeof...(INDEX) < RANK, "Number of slice indices must be less than rank");
@@ -696,7 +696,7 @@ public:
      * @brief Check if array has been allocated
      * @return true if array owns or references memory
      */
-    [[nodiscard]] inline bool isAllocated() const noexcept {
+    inline bool isAllocated() const noexcept {
         return allocated != JIARRAY_ALLOCATED_NONE;
     }
 
@@ -705,12 +705,12 @@ public:
      * @param idx Linear offset from array start
      * @return Pointer to memory location
      */
-    [[nodiscard]] inline T* getMemory(int idx = 0) noexcept {
+    inline T* getMemory(int idx = 0) noexcept {
         return mm + idx;
     }
 
     /// @overload
-    [[nodiscard]] inline const T* getMemory(int idx = 0) const noexcept {
+    inline const T* getMemory(int idx = 0) const noexcept {
         return mm + idx;
     }
 
@@ -718,12 +718,12 @@ public:
      * @brief Get raw pointer to data
      * @return Pointer to first element
      */
-    [[nodiscard]] inline T* data() noexcept {
+    inline T* data() noexcept {
         return mm;
     }
 
     /// @overload
-    [[nodiscard]] inline const T* data() const noexcept {
+    inline const T* data() const noexcept {
         return mm;
     }
 
@@ -731,12 +731,12 @@ public:
      * @brief Get total number of elements
      * @return Total element count
      */
-    [[nodiscard]] inline const int& size() const noexcept {
+    inline const int& size() const noexcept {
         return nn;
     }
 
     /// @overload
-    [[nodiscard]] inline int getSize() const noexcept {
+    inline int getSize() const noexcept {
         return nn;
     }
 
@@ -744,7 +744,7 @@ public:
      * @brief Get array of stride values
      * @return Pointer to rankSize array
      */
-    [[nodiscard]] inline const int* getRankSize() const noexcept {
+    inline const int* getRankSize() const noexcept {
         return rankSize;
     }
 
@@ -752,7 +752,7 @@ public:
      * @brief Get array of dimension sizes
      * @return Pointer to sizes array
      */
-    [[nodiscard]] inline const int* getSizeOfRank() const noexcept {
+    inline const int* getSizeOfRank() const noexcept {
         return sizes;
     }
 
@@ -761,7 +761,7 @@ public:
      * @param rank Dimension number (1-based or 0-based depending on JIARRAY_OFFSET)
      * @return Size of specified dimension
      */
-    [[nodiscard]] inline const int& getSize(int rank) const {
+    inline const int& getSize(int rank) const {
         JIARRAY_CHECK_BOUND(rank, JIARRAY_OFFSET, JIARRAY_OFFSET + RANK - 1);
         return sizes[rank - JIARRAY_OFFSET];
     }
@@ -770,7 +770,7 @@ public:
      * @brief Get array of index offsets
      * @return Pointer to offset array
      */
-    [[nodiscard]] inline const int* getOffset() const noexcept {
+    inline const int* getOffset() const noexcept {
         return offset;
     }
 
@@ -779,7 +779,7 @@ public:
      * @param rank Dimension number
      * @return Offset value for specified dimension
      */
-    [[nodiscard]] inline const int& getOffset(int rank) const noexcept {
+    inline const int& getOffset(int rank) const noexcept {
         return offset[rank - JIARRAY_OFFSET];
     }
 
@@ -794,16 +794,17 @@ public:
      * @return Reference to element
      * @note Performs bounds checking in debug mode
      */
-    template <typename... Args>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK), T&>
-    at(Args... index) {
+    template <typename... Args,
+              typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
+    inline T& at(Args... index) {
         int pos = calculateIndex(index...);
         return mm[pos];
     }
 
     /// @overload
-    template <typename... Args>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK), const T&>
+    template <typename... Args,
+              typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
+    inline const T&
     at(Args... index) const {
         int pos = calculateIndex(index...);
         return mm[pos];
@@ -815,16 +816,16 @@ public:
      * @param index Multidimensional indices
      * @return Reference to element
      */
-    template <typename... Args>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK), const T&>
-    operator()(Args... index) const {
+    template <typename... Args,
+              typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
+    inline const T& operator()(Args... index) const {
         return at(index...);
     }
 
     /// @overload
-    template <typename... Args>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK), T&>
-    operator()(Args... index) {
+    template <typename... Args,
+              typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
+    inline T& operator()(Args... index) {
         return at(index...);
     }
 
@@ -833,7 +834,7 @@ public:
      * @param idx FastArray containing indices
      * @return Reference to element
      */
-    [[nodiscard]] inline T& operator()(const FastArray<int, RANK>& idx) {
+    inline T& operator()(const FastArray<int, RANK>& idx) {
         int pos = -sumOfOffset;
 
         for (int i = 0; i < RANK; i++) {
@@ -845,7 +846,7 @@ public:
     }
 
     /// @overload
-    [[nodiscard]] inline const T& operator()(const FastArray<int, RANK>& idx) const {
+    inline const T& operator()(const FastArray<int, RANK>& idx) const {
         return const_cast<this_type&>(*this)(idx);
     }
 
@@ -857,7 +858,7 @@ public:
      * @note Number of indices must be between 1 and RANK
      */
     template <typename... INDEX>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<INDEX...>, T*>
+    inline std::enable_if_t<all_integral_v<INDEX...>, T*>
     data(INDEX... index) {
         constexpr int num_idx = sizeof...(index);
         static_assert(num_idx >= 1 && num_idx <= RANK, "Number of indices must be between 1 and RANK");
@@ -882,7 +883,7 @@ public:
 
     /// @overload
     template <typename... INDEX>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<INDEX...>, const T*>
+    inline std::enable_if_t<all_integral_v<INDEX...>, const T*>
     data(INDEX... index) const {
         return const_cast<this_type&>(*this).data(index...);
     }
@@ -899,9 +900,9 @@ public:
      * @note Total element count must remain the same
      */
     template <typename... INTS2>
-    [[nodiscard]] inline std::enable_if_t<all_integral_v<INTS2...>, JIArray<T, sizeof...(INTS2)>>
+    inline std::enable_if_t<all_integral_v<INTS2...>, JIArray<T, sizeof...(INTS2)>>
     reshape(INTS2... sizes) {
-        
+
         int total_size = (1 * ... * sizes);
 
         JIARRAY_CHECK_SIZE(nn, total_size);
@@ -1003,7 +1004,7 @@ public:
      * @note Requires T to be arithmetic type
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] inline T average() const {
+    inline T average() const {
         static_assert(std::is_arithmetic_v<T>, "Average requires arithmetic type");
         T result = T{};
 
@@ -1020,7 +1021,7 @@ public:
      * @return Sum of elements
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] inline T sum() const {
+    inline T sum() const {
         T result = T{};
         // JIARRAY_SIMD_REDUCTION("+", result)
         for (int i = 0; i < nn; ++i) {
@@ -1033,7 +1034,7 @@ public:
      * @brief Find maximum element value
      * @return Maximum value
      */
-    [[nodiscard]] inline T max() const {
+    inline T max() const {
         assert(nn > 0);
         return *std::max_element(mm, mm + nn);
     }
@@ -1042,7 +1043,7 @@ public:
      * @brief Find minimum element value
      * @return Minimum value
      */
-    [[nodiscard]] inline T min() const {
+    inline T min() const {
         assert(nn > 0);
         return *std::min_element(mm, mm + nn);
     }
@@ -1056,7 +1057,7 @@ public:
      * @param array Array to compare with
      * @return true if all elements are equal
      */
-    [[nodiscard]] inline bool operator==(const this_type& array) const {
+    inline bool operator==(const this_type& array) const {
         if (nn != array.nn)
             return false;
         return std::equal(mm, mm + nn, array.mm);
@@ -1067,7 +1068,7 @@ public:
      * @param array Array to compare with
      * @return true if any element differs
      */
-    [[nodiscard]] inline bool operator!=(const this_type& array) const {
+    inline bool operator!=(const this_type& array) const {
         return !(*this == array);
     }
 
@@ -1110,7 +1111,7 @@ public:
      * @return New array containing sum
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] inline this_type operator+(const this_type& array) const {
+    inline this_type operator+(const this_type& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         this_type result;
         result.initByRankSize(getSize(), getRankSize(), getOffset());
@@ -1142,7 +1143,7 @@ public:
      * @return New array containing difference
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] inline this_type operator-(const this_type& array) const {
+    inline this_type operator-(const this_type& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         this_type result;
         result.initByRankSize(getSize(), getRankSize(), getOffset());
@@ -1159,7 +1160,7 @@ public:
      * @return New array with negated elements
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] friend inline this_type operator-(const this_type& array) {
+    friend inline this_type operator-(const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
         JIARRAY_SIMD_LOOP
@@ -1204,7 +1205,7 @@ public:
      * @return New array containing product
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] inline this_type operator*(const this_type& array) const {
+    inline this_type operator*(const this_type& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         this_type result;
         result.initByRankSize(getSize(), getRankSize(), getOffset());
@@ -1260,7 +1261,7 @@ public:
      * @return New array containing quotient
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] friend inline this_type operator/(const this_type& lhs, const this_type& rhs) {
+    friend inline this_type operator/(const this_type& lhs, const this_type& rhs) {
         JIARRAY_CHECK_SIZE(lhs.nn, rhs.nn);
         this_type result;
         result.initByRankSize(lhs.getSize(), lhs.getRankSize(), lhs.getOffset());
@@ -1284,7 +1285,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    [[nodiscard]] friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator+(const Scalar& val, const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1297,7 +1298,7 @@ public:
 
     /// @overload
     template <typename Scalar>
-    [[nodiscard]] friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator+(const this_type& array, const Scalar& val) {
         return val + array;
     }
@@ -1311,7 +1312,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    [[nodiscard]] friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator*(const Scalar& val, const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1324,7 +1325,7 @@ public:
 
     /// @overload
     template <typename Scalar>
-    [[nodiscard]] friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator*(const this_type& array, const Scalar& val) {
         return val * array;
     }
@@ -1338,7 +1339,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    [[nodiscard]] friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator/(const Scalar& val, const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1358,7 +1359,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    [[nodiscard]] friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator/(const this_type& array, const Scalar& val) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1388,7 +1389,7 @@ public:
      * @note Returns double for numerical stability
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] inline double sqsum() const {
+    inline double sqsum() const {
         double result = 0;
         // JIARRAY_SIMD_REDUCTION("+", result)
         for (int i = 0; i < nn; ++i) {
@@ -1405,7 +1406,7 @@ public:
      * @note Arrays must have same dimensions and offsets
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    [[nodiscard]] friend inline T dot(const this_type& array1, const this_type& array2) {
+    friend inline T dot(const this_type& array1, const this_type& array2) {
         JIARRAY_CHECK_SIZE(array1.nn, array2.nn);
         for (int rank = 0; rank < RANK; ++rank) {
             assert(array1.sizes[rank] == array2.sizes[rank]);
@@ -1429,7 +1430,7 @@ public:
      * @param item Value to search for
      * @return true if item is found
      */
-    [[nodiscard]] inline bool contains(const T& item) const {
+    inline bool contains(const T& item) const {
         return std::find(mm, mm + nn, item) != (mm + nn);
     }
 
@@ -1439,7 +1440,7 @@ public:
      * @return For 1D: linear index; For ND: FastArray with multidimensional indices
      * @note Returns offset-adjusted indices, or -1+OFFSET if not found
      */
-    [[nodiscard]] inline auto findFirst(const T& item) const {
+    inline auto findFirst(const T& item) const {
         if constexpr (RANK == 1) {
             auto it = std::find(mm, mm + nn, item);
             if (it == mm + nn)
@@ -1476,7 +1477,7 @@ public:
      * @brief Find location of maximum element
      * @return FastArray containing multidimensional indices of maximum element
      */
-    [[nodiscard]] inline FastArray<int, RANK> maxloc() const {
+    inline FastArray<int, RANK> maxloc() const {
         assert(nn > 0);
         auto it     = std::max_element(mm, mm + nn);
         int  maxloc = static_cast<int>(std::distance(mm, it));
@@ -1504,7 +1505,7 @@ public:
      * @param to End index (exclusive or inclusive depending on JIARRAY_OFFSET)
      * @return FastArray containing multidimensional indices of maximum element
      */
-    [[nodiscard]] inline FastArray<int, RANK> maxloc(int from, int to) const {
+    inline FastArray<int, RANK> maxloc(int from, int to) const {
         assert(from >= JIARRAY_OFFSET && to <= nn + JIARRAY_OFFSET);
         auto it     = std::max_element(mm + from - JIARRAY_OFFSET, mm + to - JIARRAY_OFFSET);
         int  maxloc = static_cast<int>(std::distance(mm, it));
@@ -1532,7 +1533,7 @@ public:
      * @brief Create a deep copy of the array
      * @return New array with copied data
      */
-    [[nodiscard]] inline this_type copy() const {
+    inline this_type copy() const {
         this_type array;
         array = *this;
         return array;
@@ -1559,7 +1560,7 @@ public:
      * @brief Convert array to std::vector
      * @return Vector containing copy of all elements
      */
-    [[nodiscard]] inline std::vector<T> convertToVector() const {
+    inline std::vector<T> convertToVector() const {
         return std::vector<T>(mm, mm + nn);
     }
 
@@ -1587,10 +1588,10 @@ public:
         }
 
         // Arithmetic operators
-        [[nodiscard]] constexpr Iterator operator+(difference_type n) const noexcept {
+        constexpr Iterator operator+(difference_type n) const noexcept {
             return Iterator(m_ptr + n);
         }
-        [[nodiscard]] constexpr Iterator operator-(difference_type n) const noexcept {
+        constexpr Iterator operator-(difference_type n) const noexcept {
             return Iterator(m_ptr - n);
         }
 
@@ -1603,33 +1604,33 @@ public:
             return *this;
         }
 
-        [[nodiscard]] constexpr reference operator[](difference_type n) noexcept {
+        constexpr reference operator[](difference_type n) noexcept {
             return *(m_ptr + n);
         }
 
-        [[nodiscard]] constexpr difference_type operator-(const Iterator& other) const noexcept {
+        constexpr difference_type operator-(const Iterator& other) const noexcept {
             return m_ptr - other.m_ptr;
         }
 
         // Comparison operators
-        [[nodiscard]] constexpr bool operator<(const Iterator& other) const noexcept {
+        constexpr bool operator<(const Iterator& other) const noexcept {
             return m_ptr < other.m_ptr;
         }
-        [[nodiscard]] constexpr bool operator<=(const Iterator& other) const noexcept {
+        constexpr bool operator<=(const Iterator& other) const noexcept {
             return m_ptr <= other.m_ptr;
         }
-        [[nodiscard]] constexpr bool operator>(const Iterator& other) const noexcept {
+        constexpr bool operator>(const Iterator& other) const noexcept {
             return m_ptr > other.m_ptr;
         }
-        [[nodiscard]] constexpr bool operator>=(const Iterator& other) const noexcept {
+        constexpr bool operator>=(const Iterator& other) const noexcept {
             return m_ptr >= other.m_ptr;
         }
 
         // Dereference operators
-        [[nodiscard]] constexpr reference operator*() const noexcept {
+        constexpr reference operator*() const noexcept {
             return *m_ptr;
         }
-        [[nodiscard]] constexpr pointer operator->() const noexcept {
+        constexpr pointer operator->() const noexcept {
             return m_ptr;
         }
 
@@ -1654,10 +1655,10 @@ public:
         }
 
         // Equality operators
-        [[nodiscard]] friend constexpr bool operator==(const Iterator& a, const Iterator& b) noexcept {
+        friend constexpr bool operator==(const Iterator& a, const Iterator& b) noexcept {
             return a.m_ptr == b.m_ptr;
         }
-        [[nodiscard]] friend constexpr bool operator!=(const Iterator& a, const Iterator& b) noexcept {
+        friend constexpr bool operator!=(const Iterator& a, const Iterator& b) noexcept {
             return a.m_ptr != b.m_ptr;
         }
 
@@ -1685,10 +1686,10 @@ public:
         }
 
         // Arithmetic operators
-        [[nodiscard]] constexpr ConstIterator operator+(difference_type n) const noexcept {
+        constexpr ConstIterator operator+(difference_type n) const noexcept {
             return ConstIterator(m_ptr + n);
         }
-        [[nodiscard]] constexpr ConstIterator operator-(difference_type n) const noexcept {
+        constexpr ConstIterator operator-(difference_type n) const noexcept {
             return ConstIterator(m_ptr - n);
         }
 
@@ -1701,33 +1702,33 @@ public:
             return *this;
         }
 
-        [[nodiscard]] constexpr reference operator[](difference_type n) const noexcept {
+        constexpr reference operator[](difference_type n) const noexcept {
             return *(m_ptr + n);
         }
 
-        [[nodiscard]] constexpr difference_type operator-(const ConstIterator& other) const noexcept {
+        constexpr difference_type operator-(const ConstIterator& other) const noexcept {
             return m_ptr - other.m_ptr;
         }
 
         // Comparison operators
-        [[nodiscard]] constexpr bool operator<(const ConstIterator& other) const noexcept {
+        constexpr bool operator<(const ConstIterator& other) const noexcept {
             return m_ptr < other.m_ptr;
         }
-        [[nodiscard]] constexpr bool operator<=(const ConstIterator& other) const noexcept {
+        constexpr bool operator<=(const ConstIterator& other) const noexcept {
             return m_ptr <= other.m_ptr;
         }
-        [[nodiscard]] constexpr bool operator>(const ConstIterator& other) const noexcept {
+        constexpr bool operator>(const ConstIterator& other) const noexcept {
             return m_ptr > other.m_ptr;
         }
-        [[nodiscard]] constexpr bool operator>=(const ConstIterator& other) const noexcept {
+        constexpr bool operator>=(const ConstIterator& other) const noexcept {
             return m_ptr >= other.m_ptr;
         }
 
         // Dereference operators - const만!
-        [[nodiscard]] constexpr reference operator*() const noexcept {
+        constexpr reference operator*() const noexcept {
             return *m_ptr;
         }
-        [[nodiscard]] constexpr pointer operator->() const noexcept {
+        constexpr pointer operator->() const noexcept {
             return m_ptr;
         }
 
@@ -1752,10 +1753,10 @@ public:
         }
 
         // Equality operators
-        [[nodiscard]] friend constexpr bool operator==(const ConstIterator& a, const ConstIterator& b) noexcept {
+        friend constexpr bool operator==(const ConstIterator& a, const ConstIterator& b) noexcept {
             return a.m_ptr == b.m_ptr;
         }
-        [[nodiscard]] friend constexpr bool operator!=(const ConstIterator& a, const ConstIterator& b) noexcept {
+        friend constexpr bool operator!=(const ConstIterator& a, const ConstIterator& b) noexcept {
             return a.m_ptr != b.m_ptr;
         }
 
@@ -1765,22 +1766,22 @@ public:
 
     /// @name Iterator access
     /// @{
-    [[nodiscard]] Iterator begin() noexcept {
+    Iterator begin() noexcept {
         return Iterator(mm);
     }
-    [[nodiscard]] Iterator end() noexcept {
+    Iterator end() noexcept {
         return Iterator(mm + nn);
     }
-    [[nodiscard]] ConstIterator begin() const noexcept {
+    ConstIterator begin() const noexcept {
         return ConstIterator(mm);
     }
-    [[nodiscard]] ConstIterator end() const noexcept {
+    ConstIterator end() const noexcept {
         return ConstIterator(mm + nn);
     }
-    [[nodiscard]] ConstIterator cbegin() const noexcept {
+    ConstIterator cbegin() const noexcept {
         return ConstIterator(mm);
     }
-    [[nodiscard]] ConstIterator cend() const noexcept {
+    ConstIterator cend() const noexcept {
         return ConstIterator(mm + nn);
     }
     /// @}
