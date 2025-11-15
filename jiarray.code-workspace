@@ -75,7 +75,14 @@
 			"stdexcept": "cpp",
 			"streambuf": "cpp",
 			"typeinfo": "cpp",
-			"variant": "cpp"
+			"variant": "cpp",
+			"flat_map": "cpp",
+			"flat_set": "cpp",
+			"generator": "cpp",
+			"ranges": "cpp",
+			"stacktrace": "cpp",
+			"regex": "cpp",
+			"valarray": "cpp"
 		}
 	}
 }

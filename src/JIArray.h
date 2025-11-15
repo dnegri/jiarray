@@ -1847,13 +1847,18 @@ public:
  * @param i Loop variable
  * @param begin Start index
  * @param end End index (inclusive for 1-based, exclusive for 0-based)
+ * @param step Step size (optional, defaults to 1)
  */
+// Helper macro to get optional step parameter (defaults to 1)
+#define GET_STEP_IMPL(_1, _2, N, ...) N
+#define GET_STEP(...) GET_STEP_IMPL(__VA_ARGS__, __VA_ARGS__, 1)
+
 #if JIARRAY_OFFSET == 0
-    #define ffor(i, begin, end)      for (int i = begin; i < end; ++i)
-    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+    #define ffor(i, begin, end, ...)      for (int i = begin; i < end; i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
 #else
-    #define ffor(i, begin, end)      for (int i = begin; i <= end; ++i)
-    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+    #define ffor(i, begin, end, ...)      for (int i = begin; i <= end; i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
 #endif
 
 /**
