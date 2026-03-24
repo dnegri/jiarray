@@ -1,4 +1,4 @@
-#include "../src/JIArray.h" // Ensure this path points to your JIArray class
+#include <jiarray/JIArray.h>
 #include <gtest/gtest.h>
 
 using namespace dnegri::jiarray;

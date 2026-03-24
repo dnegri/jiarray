@@ -1,4 +1,4 @@
-#include "../src/JIArray.h"
+#include <jiarray/JIArray.h>
 #include "blitz/array.h"
 #include <ctime>
 #include <iostream>

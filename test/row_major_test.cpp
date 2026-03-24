@@ -1,4 +1,4 @@
-#include "../src/JIArray.h"
+#include <jiarray/JIArray.h>
 #include <algorithm>
 #include <gtest/gtest.h>
 #include <stdexcept>
