@@ -59,10 +59,12 @@ namespace dnegri::jiarray {
 // Helper macros for conditional SIMD - uses _Pragma for portability
 #if JIARRAY_USE_SIMD
     #define JIARRAY_SIMD_LOOP _Pragma("omp simd")
-// #define JIARRAY_SIMD_REDUCTION(op, var) _Pragma("omp simd reduction(" #op ":" #var ")")
+
+    #define JIARRAY_PRAGMA_STR(...)         #__VA_ARGS__
+    #define JIARRAY_SIMD_REDUCTION(op, var) _Pragma(JIARRAY_PRAGMA_STR(omp simd reduction(op : var)))
 #else
     #define JIARRAY_SIMD_LOOP
-// #define JIARRAY_SIMD_REDUCTION(op, var)
+    #define JIARRAY_SIMD_REDUCTION(op, var)
 #endif
 
 // ============================================================================
@@ -99,11 +101,18 @@ template <typename T>
 inline constexpr bool is_jiarray_v = is_jiarray<T>::value;
 
 /**
- * @brief Type trait to check if all types are integral
+ * @brief Type trait to check if a type is integral or enum (valid for indexing)
+ * @tparam T Type to check
+ */
+template <typename T>
+struct is_index_type : std::disjunction<std::is_integral<T>, std::is_enum<T>> {};
+
+/**
+ * @brief Type trait to check if all types are integral or enum
  * @tparam Args Variadic types to check
  */
 template <typename... Args>
-struct all_integral : std::conjunction<std::is_integral<Args>...> {};
+struct all_integral : std::conjunction<is_index_type<Args>...> {};
 
 /**
  * @brief Helper variable template for all_integral
@@ -959,6 +968,21 @@ public:
         return *this;
     }
 
+    template <typename T2, size_t NN>
+    inline this_type& operator=(const FastArray<T2, NN>& val) {
+        if (nn == 0) {
+            int dimensions[RANK];
+            std::fill(dimensions, dimensions + RANK, 1);
+            dimensions[RANK - 1] = static_cast<int>(val.size());
+            init(dimensions);
+        } else {
+            JIARRAY_CHECK_SIZE(nn, val.size());
+        }
+
+        std::copy(val.data(), val.data() + val.size(), mm);
+        return *this;
+    }
+
     /**
      * @brief Assign from C-style array
      * @param array Pointer to source array
@@ -1009,7 +1033,7 @@ public:
         T result = T{};
 
         // Conditional SIMD based on JIARRAY_USE_SIMD
-        // JIARRAY_SIMD_REDUCTION("+", result)
+        JIARRAY_SIMD_REDUCTION(+, result)
         for (int i = 0; i < nn; ++i) {
             result += mm[i];
         }
@@ -1023,7 +1047,7 @@ public:
      */
     inline T sum() const {
         T result = T{};
-        // JIARRAY_SIMD_REDUCTION("+", result)
+        JIARRAY_SIMD_REDUCTION(+, result)
         for (int i = 0; i < nn; ++i) {
             result += mm[i];
         }
@@ -1391,9 +1415,9 @@ public:
      */
     inline double sqsum() const {
         double result = 0;
-        // JIARRAY_SIMD_REDUCTION("+", result)
+        JIARRAY_SIMD_REDUCTION(+, result)
         for (int i = 0; i < nn; ++i) {
-            result += static_cast<double>(mm[i]) * static_cast<double>(mm[i]);
+            result += mm[i] * mm[i];
         }
         return result;
     }
@@ -1414,7 +1438,7 @@ public:
         }
 
         T result = T{};
-        // JIARRAY_SIMD_REDUCTION("+", result)
+        JIARRAY_SIMD_REDUCTION(+, result)
         for (int i = 0; i < array1.nn; ++i) {
             result += array1.mm[i] * array2.mm[i];
         }
@@ -1851,7 +1875,7 @@ public:
  */
 // Helper macro to get optional step parameter (defaults to 1)
 #define GET_STEP_IMPL(_1, _2, N, ...) N
-#define GET_STEP(...) GET_STEP_IMPL(__VA_ARGS__, __VA_ARGS__, 1)
+#define GET_STEP(...)                 GET_STEP_IMPL(__VA_ARGS__, __VA_ARGS__, 1)
 
 #if JIARRAY_OFFSET == 0
     #define ffor(i, begin, end, ...)      for (int i = begin; i < end; i += GET_STEP(__VA_ARGS__))
