@@ -4,3 +4,8 @@
 /x64
 build
 .DS_Store
+.groupedtimelineinclude
+test/test_macro_expansion.cpp
+test/test_pragma_syntax.cpp
+test/test_simd_performance.cpp
+test/test_simd_reduction.cpp
