@@ -1037,6 +1037,13 @@ JIARRAY_UNROLL
      */
     JIARRAY_HD inline this_type& operator=(const this_type& array) {
         if (this == &array) return *this;
+        // If source is empty (default-constructed), reset this to empty.
+        // Avoids reading `nn` bytes from array.data() == nullptr when used
+        // as e.g. std::vector::assign(N, default_value).
+        if (array.mm == nullptr || array.nn == 0) {
+            destroy();
+            return *this;
+        }
         if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
             initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
         } else {
