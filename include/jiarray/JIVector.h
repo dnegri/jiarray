@@ -3,6 +3,7 @@
 #include "JIArray.h"
 #include <algorithm>
 #include <initializer_list>
+#include <numeric>
 #include <vector>
 
 namespace dnegri::jiarray {
@@ -25,6 +26,10 @@ public:
 
     JIVector(const std::vector<_Tp>& vec)
         : Base(vec) {
+    }
+
+    JIVector(size_t size, const _Tp& value = _Tp())
+        : Base(size, value) {
     }
 
     // Accessors with custom offset
@@ -50,6 +55,10 @@ public:
 
     const_reference operator()(int index) const {
         return this->at(index);
+    }
+
+    _Tp sum() const {
+        return std::accumulate(Base::begin(), Base::end(), _Tp{});
     }
 
     iterator begin() {
@@ -88,6 +97,18 @@ public:
         }
     }
 
+    void operator*=(const _Tp& value) {
+        for (auto& val : *this) val *= value;
+    }
+
+    void operator/=(const _Tp& value) {
+        for (auto& val : *this) val /= value;
+    }
+
+    int count(const _Tp& value) const {
+        return std::count(Base::begin(), Base::end(), value);
+    }
+
     // Contains method
     bool contains(const _Tp& value) const {
         return std::find(Base::begin(), Base::end(), value) != Base::end();
@@ -99,6 +120,11 @@ public:
             return std::distance(Base::begin(), it) + JIARRAY_OFFSET;
         }
         return JIARRAY_OFFSET - 1; // Not found
+    }
+
+    /// @brief Alias for find() (CUDA version compatibility).
+    int index(const _Tp& value) const {
+        return find(value);
     }
 
     // Insert methods
@@ -118,7 +144,8 @@ public:
         Base::insert(iter, other.begin(), other.end());
     }
 
-    void insert(const_iterator iter, const_iterator first, const_iterator last) {
+    template <typename InputIterator>
+    void insert(const_iterator iter, InputIterator first, InputIterator last) {
         Base::insert(iter, first, last);
     }
 };

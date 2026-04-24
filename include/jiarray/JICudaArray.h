@@ -206,10 +206,10 @@ public:
             if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && mm != nullptr) {
                 cudaFree(mm);
             }
-            mm        = nullptr;
-            allocated = JIARRAY_ALLOCATED_NONE;
-            nn        = 0;
         }
+        mm        = nullptr;
+        allocated = JIARRAY_ALLOCATED_NONE;
+        nn        = 0;
     }
 
     void erase() {
@@ -319,7 +319,10 @@ public:
         return mm;
     }
 
-    JIARRAY_HD inline const int& size() const {
+    JIARRAY_HD inline int size() const {
+
+        if (mm == nullptr) return 0;
+
         return nn;
     }
 
@@ -603,7 +606,7 @@ public:
             return false;
 
         for (int i = 0; i < nn; ++i) {
-            if (! (array.mm[i] == this->mm[i]))
+            if (!(array.mm[i] == this->mm[i]))
                 return false;
         }
 
@@ -1127,7 +1130,7 @@ public:
                 destroy();
             }
         }
-        
+
         ar(nn, rankSize, offset, sumOfOffset, sizes, allocated);
 
         if constexpr (Archive::is_saving::value) {
@@ -1186,7 +1189,7 @@ public:
     #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
 #endif
 
-#define zfor(i, end) ffor(i, JIARRAY_OFFSET, end)
+#define zfor(i, end)      ffor(i, JIARRAY_OFFSET, end)
 #define zfor_back(i, end) ffor_back(i, end - 1 + JIARRAY_OFFSET, JIARRAY_OFFSET)
 
 template <typename Type, int N = 1>

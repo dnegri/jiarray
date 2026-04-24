@@ -29,42 +29,30 @@
 #include <type_traits>
 #include <vector>
 
+#ifdef JIARRAY_CEREAL
+    #include <cereal/archives/binary.hpp>
+#endif
+
 namespace dnegri::jiarray {
 
 // ============================================================================
 // Compile-time configuration for OpenMP usage
 // ============================================================================
-
-/**
- * @def JIARRAY_USE_SIMD
- * @brief Control SIMD vectorization in JIArray operations
- *
- * Set to 1 to enable SIMD directives, 0 to disable.
- * Should be disabled (0) when JIArray methods are called from within
- * OpenMP parallel regions to avoid overhead.
- *
- * Usage:
- * @code
- * // For use inside OpenMP parallel regions
- * #define JIARRAY_USE_SIMD 0
- *
- * // For standalone use with SIMD
- * #define JIARRAY_USE_SIMD 1
- * @endcode
- */
-#ifndef JIARRAY_USE_SIMD
-    #define JIARRAY_USE_SIMD 1
-#endif
-
-// Helper macros for conditional SIMD - uses _Pragma for portability
-#if JIARRAY_USE_SIMD
-    #define JIARRAY_SIMD_LOOP _Pragma("omp simd")
-
-    #define JIARRAY_PRAGMA_STR(...)         #__VA_ARGS__
-    #define JIARRAY_SIMD_REDUCTION(op, var) _Pragma(JIARRAY_PRAGMA_STR(omp simd reduction(op : var)))
+//
+// JIARRAY_SIMD_LOOP / JIARRAY_SIMD_REDUCTION / JIARRAY_UNROLL are defined in
+// pch.h with compiler-portable fallbacks (MSVC loop(ivdep), clang/GCC unroll
+// pragmas, CUDA/ICC #pragma unroll).  To disable SIMD explicitly — e.g. when
+// calling JIArray ops from inside an OpenMP parallel region — compile with
+// -DJIARRAY_USE_SIMD=0 (or pre-define before including this header).
+#ifdef JIARRAY_USE_SIMD
+    #if JIARRAY_USE_SIMD == 0
+        #undef  JIARRAY_SIMD_LOOP
+        #undef  JIARRAY_SIMD_REDUCTION
+        #define JIARRAY_SIMD_LOOP
+        #define JIARRAY_SIMD_REDUCTION(op, var)
+    #endif
 #else
-    #define JIARRAY_SIMD_LOOP
-    #define JIARRAY_SIMD_REDUCTION(op, var)
+    #define JIARRAY_USE_SIMD 1
 #endif
 
 // ============================================================================
@@ -201,7 +189,7 @@ class JIArray<T, RANK, std::index_sequence<INTS...>> {
 private:
     // Compile-time checks
     static_assert(RANK > 0, "Array rank must be at least 1");
-    static_assert(std::is_default_constructible_v<T>, "Element type must be default constructible");
+    // Note: default constructible check removed for CUDA compatibility with forward-declared types
 
     /// Storage order flag: true for row-major, false for column-major
     constexpr static bool is_row_major = (JIARRAY_COLUMN_MAJOR == 0);
@@ -227,7 +215,7 @@ private:
      * @note Uses manual loop unrolling for small ranks (≤ 4) for better performance
      */
     template <typename... Args>
-    inline int calculateIndex(Args... indices) const {
+    JIARRAY_HD inline int calculateIndex(Args... indices) const {
         static_assert(sizeof...(indices) == RANK, "Number of indices must match array rank");
         static_assert(all_integral_v<Args...>, "All indices must be integral types");
 
@@ -236,7 +224,7 @@ private:
 
         // Manual unrolling for small ranks
         if constexpr (RANK <= 4) {
-#pragma unroll
+JIARRAY_UNROLL
             for (int i = 0; i < RANK; i++) {
                 JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + sizes[i] - 1);
                 pos += rankSize[i] * idx[i];
@@ -262,7 +250,7 @@ private:
             // Row-major: rightmost dimension has stride 1
             rankSize[RANK - 1] = 1;
             if constexpr (RANK > 1) {
-#pragma unroll
+JIARRAY_UNROLL
                 for (int i = static_cast<int>(RANK) - 2; i >= 0; i--) {
                     rankSize[i] = rankSize[i + 1] * dimensions[i + 1];
                 }
@@ -271,7 +259,7 @@ private:
             // Column-major: leftmost dimension has stride 1
             rankSize[0] = 1;
             if constexpr (RANK > 1) {
-#pragma unroll
+JIARRAY_UNROLL
                 for (int i = 1; i < RANK; i++) {
                     rankSize[i] = rankSize[i - 1] * dimensions[i - 1];
                 }
@@ -294,7 +282,7 @@ private:
         int       p_mm  = 0;
 
         if constexpr (is_row_major) {
-#pragma unroll
+JIARRAY_UNROLL
             for (int i = 0; i < num_idx; i++) {
                 JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + sizes[i] - 1);
                 p_mm += rankSize[i] * (idx[i] - offset[i]);
@@ -350,25 +338,54 @@ public:
     }
 
     /**
-     * @brief Copy constructor (creates a view, not a deep copy)
+     * @brief Copy constructor — creates a non-owning view (shallow).
      * @param array Source array
-     * @note This creates a shallow copy that shares memory with the source
+     * @note Intended for slicing / return-by-value view passing.  The
+     *       produced instance never owns memory (allocated = NONE); its
+     *       destructor is a no-op.  Deep copy is only performed via the
+     *       explicit `.copy()` method or the copy assignment operator
+     *       (operator=(const this_type&)).
      */
-    JIArray(const this_type& array) noexcept {
-        nn = array.nn;
-        mm = array.mm;
+    JIArray(const this_type& array) noexcept
+        : nn(array.nn), mm(array.mm),
+          allocated(JIARRAY_ALLOCATED_NONE),
+          sumOfOffset(array.sumOfOffset) {
         std::copy(array.rankSize, array.rankSize + RANK, rankSize);
-        std::copy(array.offset, array.offset + RANK, offset);
-        allocated   = JIARRAY_ALLOCATED_NONE;
-        sumOfOffset = array.sumOfOffset;
-        std::copy(array.sizes, array.sizes + RANK, sizes);
+        std::copy(array.offset,   array.offset   + RANK, offset);
+        std::copy(array.sizes,    array.sizes    + RANK, sizes);
     }
 
     /**
-     * @brief Virtual destructor
-     * @note Automatically deallocates memory if owned by this array
+     * @brief Move constructor — transfers ownership.
+     * @param other Source array; left empty (mm=nullptr, nn=0, allocated=NONE).
+     * @note Required for safe return-by-value / struct-embedded members
+     *       / containers.  The moved-from object is destructor-safe
+     *       (no double-free) and can be reused via init().
      */
-    virtual ~JIArray() {
+    JIArray(this_type&& other) noexcept
+        : nn(other.nn), mm(other.mm),
+          allocated(other.allocated),
+          sumOfOffset(other.sumOfOffset) {
+        std::copy(other.rankSize, other.rankSize + RANK, rankSize);
+        std::copy(other.offset,   other.offset   + RANK, offset);
+        std::copy(other.sizes,    other.sizes    + RANK, sizes);
+
+        other.mm          = nullptr;
+        other.nn          = 0;
+        other.allocated   = JIARRAY_ALLOCATED_NONE;
+        other.sumOfOffset = 0;
+        std::fill(other.rankSize, other.rankSize + RANK, 0);
+        std::fill(other.offset,   other.offset   + RANK, 0);
+        std::fill(other.sizes,    other.sizes    + RANK, 0);
+    }
+
+    /**
+     * @brief Destructor — deallocates memory if this instance owns it.
+     * @note Not virtual — JIArray is not designed for polymorphic use;
+     *       keeping it non-virtual avoids a per-instance vptr (8 bytes)
+     *       and lets the compiler default move operations cheaply.
+     */
+    ~JIArray() {
         destroy();
     }
 
@@ -418,7 +435,7 @@ public:
         int       dimensions[RANK];
         int       offsets[RANK];
 
-#pragma unroll
+JIARRAY_UNROLL
         for (int i = 0; i < RANK; i++) {
             dimensions[i] = temp_size[2 * i + 1] - temp_size[2 * i] + 1;
             offsets[i]    = temp_size[2 * i];
@@ -560,30 +577,33 @@ public:
     // ========================================================================
 
     /**
-     * @brief Destroy array and deallocate memory if owned
-     * @note Only deallocates if this array owns the memory
+     * @brief Destroy array and deallocate memory if owned.
+     * @note Resets every metadata field so the instance is safe to reuse
+     *       via init() and matches the post-move "empty" state.  Previous
+     *       versions left stride/size/offset stale — callers relying on
+     *       `getSizeOfRank()` after destroy() would observe garbage.
      */
     void destroy() {
         if (allocated != JIARRAY_ALLOCATED_NONE) {
             if ((allocated & JIARRAY_ALLOCATED_MEMORY) != 0 && mm != nullptr) {
                 delete[] mm;
             }
-            mm        = nullptr;
-            allocated = JIARRAY_ALLOCATED_NONE;
-            nn        = 0;
         }
+        mm          = nullptr;
+        allocated   = JIARRAY_ALLOCATED_NONE;
+        nn          = 0;
+        sumOfOffset = 0;
+        std::fill(rankSize, rankSize + RANK, 0);
+        std::fill(offset,   offset   + RANK, 0);
+        std::fill(sizes,    sizes    + RANK, 0);
     }
 
     /**
-     * @brief Erase array completely, resetting all metadata
-     * @note Deallocates memory and resets all dimension information
+     * @brief Erase array completely (alias for destroy()).
+     * @note Retained for API compatibility.  Identical to destroy().
      */
     void erase() {
         destroy();
-        std::fill(rankSize, rankSize + RANK, 0);
-        std::fill(offset, offset + RANK, 0);
-        std::fill(sizes, sizes + RANK, 0);
-        sumOfOffset = 0;
     }
 
     // ========================================================================
@@ -597,7 +617,7 @@ public:
      * @note Updates internal stride calculations
      */
     template <typename... Args>
-    std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK), void> inline setOffsets(Args... offsets) noexcept {
+    JIARRAY_HD std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK), void> inline setOffsets(Args... offsets) noexcept {
         const int tempOffsets[] = {static_cast<int>(offsets)...};
         setOffsets(tempOffsets);
     }
@@ -606,7 +626,7 @@ public:
      * @brief Set index offsets from array
      * @param offsets Array of offset values
      */
-    inline void setOffsets(const int offsets[RANK]) noexcept {
+    JIARRAY_HD inline void setOffsets(const int offsets[RANK]) noexcept {
         std::copy(offsets, offsets + RANK, offset);
         sumOfOffset = 0;
         for (int i = 0; i < RANK; i++) {
@@ -653,7 +673,7 @@ public:
      * @endcode
      */
     template <typename... INDEX>
-    inline JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) {
+    JIARRAY_HD inline JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) {
         constexpr int RANK2 = RANK - sizeof...(INDEX);
         static_assert(RANK2 > 0, "Slice rank must be at least 1");
         static_assert(sizeof...(INDEX) < RANK, "Number of slice indices must be less than rank");
@@ -679,7 +699,7 @@ public:
      * @note Returns a const view that prevents modification of the original data
      */
     template <typename... INDEX>
-    inline const JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
+    JIARRAY_HD inline const JIArray<T, RANK - sizeof...(INDEX)> slice(INDEX... index) const {
         constexpr int RANK2 = RANK - sizeof...(INDEX);
         static_assert(RANK2 > 0, "Slice rank must be at least 1");
         static_assert(sizeof...(INDEX) < RANK, "Number of slice indices must be less than rank");
@@ -705,7 +725,7 @@ public:
      * @brief Check if array has been allocated
      * @return true if array owns or references memory
      */
-    inline bool isAllocated() const noexcept {
+    JIARRAY_HD inline bool isAllocated() const noexcept {
         return allocated != JIARRAY_ALLOCATED_NONE;
     }
 
@@ -714,12 +734,12 @@ public:
      * @param idx Linear offset from array start
      * @return Pointer to memory location
      */
-    inline T* getMemory(int idx = 0) noexcept {
+    JIARRAY_HD inline T* getMemory(int idx = 0) noexcept {
         return mm + idx;
     }
 
     /// @overload
-    inline const T* getMemory(int idx = 0) const noexcept {
+    JIARRAY_HD inline const T* getMemory(int idx = 0) const noexcept {
         return mm + idx;
     }
 
@@ -727,12 +747,12 @@ public:
      * @brief Get raw pointer to data
      * @return Pointer to first element
      */
-    inline T* data() noexcept {
+    JIARRAY_HD inline T* data() noexcept {
         return mm;
     }
 
     /// @overload
-    inline const T* data() const noexcept {
+    JIARRAY_HD inline const T* data() const noexcept {
         return mm;
     }
 
@@ -740,12 +760,12 @@ public:
      * @brief Get total number of elements
      * @return Total element count
      */
-    inline const int& size() const noexcept {
+    JIARRAY_HD inline const int& size() const noexcept {
         return nn;
     }
 
     /// @overload
-    inline int getSize() const noexcept {
+    JIARRAY_HD inline int getSize() const noexcept {
         return nn;
     }
 
@@ -753,7 +773,7 @@ public:
      * @brief Get array of stride values
      * @return Pointer to rankSize array
      */
-    inline const int* getRankSize() const noexcept {
+    JIARRAY_HD inline const int* getRankSize() const noexcept {
         return rankSize;
     }
 
@@ -761,7 +781,7 @@ public:
      * @brief Get array of dimension sizes
      * @return Pointer to sizes array
      */
-    inline const int* getSizeOfRank() const noexcept {
+    JIARRAY_HD inline const int* getSizeOfRank() const noexcept {
         return sizes;
     }
 
@@ -770,7 +790,7 @@ public:
      * @param rank Dimension number (1-based or 0-based depending on JIARRAY_OFFSET)
      * @return Size of specified dimension
      */
-    inline const int& getSize(int rank) const {
+    JIARRAY_HD inline const int& getSize(int rank) const {
         JIARRAY_CHECK_BOUND(rank, JIARRAY_OFFSET, JIARRAY_OFFSET + RANK - 1);
         return sizes[rank - JIARRAY_OFFSET];
     }
@@ -779,7 +799,7 @@ public:
      * @brief Get array of index offsets
      * @return Pointer to offset array
      */
-    inline const int* getOffset() const noexcept {
+    JIARRAY_HD inline const int* getOffset() const noexcept {
         return offset;
     }
 
@@ -788,7 +808,7 @@ public:
      * @param rank Dimension number
      * @return Offset value for specified dimension
      */
-    inline const int& getOffset(int rank) const noexcept {
+    JIARRAY_HD inline const int& getOffset(int rank) const noexcept {
         return offset[rank - JIARRAY_OFFSET];
     }
 
@@ -805,7 +825,7 @@ public:
      */
     template <typename... Args,
               typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
-    inline T& at(Args... index) {
+    JIARRAY_HD inline T& at(Args... index) {
         int pos = calculateIndex(index...);
         return mm[pos];
     }
@@ -813,7 +833,7 @@ public:
     /// @overload
     template <typename... Args,
               typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
-    inline const T&
+    JIARRAY_HD inline const T&
     at(Args... index) const {
         int pos = calculateIndex(index...);
         return mm[pos];
@@ -827,14 +847,14 @@ public:
      */
     template <typename... Args,
               typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
-    inline const T& operator()(Args... index) const {
+    JIARRAY_HD inline const T& operator()(Args... index) const {
         return at(index...);
     }
 
     /// @overload
     template <typename... Args,
               typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
-    inline T& operator()(Args... index) {
+    JIARRAY_HD inline T& operator()(Args... index) {
         return at(index...);
     }
 
@@ -843,7 +863,7 @@ public:
      * @param idx FastArray containing indices
      * @return Reference to element
      */
-    inline T& operator()(const FastArray<int, RANK>& idx) {
+    JIARRAY_HD inline T& operator()(const FastArray<int, RANK>& idx) {
         int pos = -sumOfOffset;
 
         for (int i = 0; i < RANK; i++) {
@@ -855,8 +875,18 @@ public:
     }
 
     /// @overload
-    inline const T& operator()(const FastArray<int, RANK>& idx) const {
+    JIARRAY_HD inline const T& operator()(const FastArray<int, RANK>& idx) const {
         return const_cast<this_type&>(*this)(idx);
+    }
+
+    /// @brief Array subscript operator (for 1D access by flat index).
+    JIARRAY_HD inline T& operator[](size_t index) {
+        return mm[index];
+    }
+
+    /// @brief Const array subscript operator.
+    JIARRAY_HD inline const T& operator[](size_t index) const {
+        return mm[index];
     }
 
     /**
@@ -867,7 +897,7 @@ public:
      * @note Number of indices must be between 1 and RANK
      */
     template <typename... INDEX>
-    inline std::enable_if_t<all_integral_v<INDEX...>, T*>
+    JIARRAY_HD inline std::enable_if_t<all_integral_v<INDEX...>, T*>
     data(INDEX... index) {
         constexpr int num_idx = sizeof...(index);
         static_assert(num_idx >= 1 && num_idx <= RANK, "Number of indices must be between 1 and RANK");
@@ -892,7 +922,7 @@ public:
 
     /// @overload
     template <typename... INDEX>
-    inline std::enable_if_t<all_integral_v<INDEX...>, const T*>
+    JIARRAY_HD inline std::enable_if_t<all_integral_v<INDEX...>, const T*>
     data(INDEX... index) const {
         return const_cast<this_type&>(*this).data(index...);
     }
@@ -909,7 +939,7 @@ public:
      * @note Total element count must remain the same
      */
     template <typename... INTS2>
-    inline std::enable_if_t<all_integral_v<INTS2...>, JIArray<T, sizeof...(INTS2)>>
+    JIARRAY_HD inline std::enable_if_t<all_integral_v<INTS2...>, JIArray<T, sizeof...(INTS2)>>
     reshape(INTS2... sizes) {
 
         int total_size = (1 * ... * sizes);
@@ -931,7 +961,7 @@ public:
      * @param list Initializer list of values
      * @return Reference to this array
      */
-    inline this_type& operator=(const std::initializer_list<T>& list) {
+    JIARRAY_HD inline this_type& operator=(const std::initializer_list<T>& list) {
         JIARRAY_CHECK_SIZE(nn, list.size());
         std::copy(list.begin(), list.end(), mm);
         return *this;
@@ -942,7 +972,7 @@ public:
      * @param val Value to assign
      * @return Reference to this array
      */
-    inline this_type& operator=(const T& val) {
+    JIARRAY_HD inline this_type& operator=(const T& val) {
         assert(nn > 0);
         std::fill(mm, mm + nn, val);
         return *this;
@@ -954,7 +984,7 @@ public:
      * @return Reference to this array
      * @note If array is empty, initializes to match vector size
      */
-    inline this_type& operator=(const std::vector<T>& val) {
+    JIARRAY_HD inline this_type& operator=(const std::vector<T>& val) {
         if (nn == 0) {
             int dimensions[RANK];
             std::fill(dimensions, dimensions + RANK, 1);
@@ -969,7 +999,7 @@ public:
     }
 
     template <typename T2, size_t NN>
-    inline this_type& operator=(const FastArray<T2, NN>& val) {
+    JIARRAY_HD inline this_type& operator=(const FastArray<T2, NN>& val) {
         if (nn == 0) {
             int dimensions[RANK];
             std::fill(dimensions, dimensions + RANK, 1);
@@ -988,19 +1018,25 @@ public:
      * @param array Pointer to source array
      * @return Reference to this array
      */
-    inline this_type& operator=(const T* array) {
+    JIARRAY_HD inline this_type& operator=(const T* array) {
         assert(nn > 0);
         std::copy(array, array + nn, mm);
         return *this;
     }
 
     /**
-     * @brief Assign from another JIArray (deep copy)
+     * @brief Copy assignment — deep copy.
      * @param array Source array
      * @return Reference to this array
-     * @note Allocates memory if this array is uninitialized
+     * @note This is the explicit "copy operator": array-to-array assignment
+     *       materialises a full element-wise copy.  If this instance is
+     *       uninitialised, it is allocated to match `array`'s shape first.
+     *       Shape mismatch is asserted (debug-only) — no silent resize.
+     *       For a one-shot deep copy of a temporary, prefer `a.copy()` to
+     *       avoid the extra default-construct/destruct roundtrip.
      */
-    inline this_type& operator=(const this_type& array) {
+    JIARRAY_HD inline this_type& operator=(const this_type& array) {
+        if (this == &array) return *this;
         if (allocated == JIARRAY_ALLOCATED_NONE && mm == nullptr) {
             initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
         } else {
@@ -1018,6 +1054,39 @@ public:
         return *this;
     }
 
+    /**
+     * @brief Move assignment — transfers ownership from an rvalue.
+     * @param other Source array (left empty after the call).
+     * @return Reference to this array.
+     * @note Paired with the move constructor; required for NRVO-safe
+     *       return-by-value into an already-initialised target and for
+     *       vector/container-based storage of structs containing JIArray.
+     *       After the move, `other` holds no memory.
+     */
+    JIARRAY_HD inline this_type& operator=(this_type&& other) noexcept {
+        if (this == &other) return *this;
+
+        destroy();
+
+        nn          = other.nn;
+        mm          = other.mm;
+        allocated   = other.allocated;
+        sumOfOffset = other.sumOfOffset;
+        std::copy(other.rankSize, other.rankSize + RANK, rankSize);
+        std::copy(other.offset,   other.offset   + RANK, offset);
+        std::copy(other.sizes,    other.sizes    + RANK, sizes);
+
+        other.mm          = nullptr;
+        other.nn          = 0;
+        other.allocated   = JIARRAY_ALLOCATED_NONE;
+        other.sumOfOffset = 0;
+        std::fill(other.rankSize, other.rankSize + RANK, 0);
+        std::fill(other.offset,   other.offset   + RANK, 0);
+        std::fill(other.sizes,    other.sizes    + RANK, 0);
+
+        return *this;
+    }
+
     // ========================================================================
     // Statistical operations - with conditional SIMD
     // ========================================================================
@@ -1028,7 +1097,7 @@ public:
      * @note Requires T to be arithmetic type
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline T average() const {
+    JIARRAY_HD inline T average() const {
         static_assert(std::is_arithmetic_v<T>, "Average requires arithmetic type");
         T result = T{};
 
@@ -1045,7 +1114,7 @@ public:
      * @return Sum of elements
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline T sum() const {
+    JIARRAY_HD inline T sum() const {
         T result = T{};
         JIARRAY_SIMD_REDUCTION(+, result)
         for (int i = 0; i < nn; ++i) {
@@ -1058,7 +1127,7 @@ public:
      * @brief Find maximum element value
      * @return Maximum value
      */
-    inline T max() const {
+    JIARRAY_HD inline T max() const {
         assert(nn > 0);
         return *std::max_element(mm, mm + nn);
     }
@@ -1067,7 +1136,7 @@ public:
      * @brief Find minimum element value
      * @return Minimum value
      */
-    inline T min() const {
+    JIARRAY_HD inline T min() const {
         assert(nn > 0);
         return *std::min_element(mm, mm + nn);
     }
@@ -1081,7 +1150,7 @@ public:
      * @param array Array to compare with
      * @return true if all elements are equal
      */
-    inline bool operator==(const this_type& array) const {
+    JIARRAY_HD inline bool operator==(const this_type& array) const {
         if (nn != array.nn)
             return false;
         return std::equal(mm, mm + nn, array.mm);
@@ -1092,7 +1161,7 @@ public:
      * @param array Array to compare with
      * @return true if any element differs
      */
-    inline bool operator!=(const this_type& array) const {
+    JIARRAY_HD inline bool operator!=(const this_type& array) const {
         return !(*this == array);
     }
 
@@ -1106,7 +1175,7 @@ public:
      * @return Reference to this array
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type& operator+=(const T& val) {
+    JIARRAY_HD inline this_type& operator+=(const T& val) {
         JIARRAY_SIMD_LOOP
         for (int i = 0; i < nn; ++i) {
             mm[i] += val;
@@ -1120,7 +1189,7 @@ public:
      * @return Reference to this array
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type& operator+=(const this_type& array) {
+    JIARRAY_HD inline this_type& operator+=(const this_type& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         JIARRAY_SIMD_LOOP
         for (int i = 0; i < nn; ++i) {
@@ -1135,7 +1204,7 @@ public:
      * @return New array containing sum
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type operator+(const this_type& array) const {
+    JIARRAY_HD inline this_type operator+(const this_type& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         this_type result;
         result.initByRankSize(getSize(), getRankSize(), getOffset());
@@ -1152,7 +1221,7 @@ public:
      * @return Reference to this array
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type& operator-=(const this_type& array) {
+    JIARRAY_HD inline this_type& operator-=(const this_type& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         JIARRAY_SIMD_LOOP
         for (int i = 0; i < nn; ++i) {
@@ -1167,7 +1236,7 @@ public:
      * @return New array containing difference
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type operator-(const this_type& array) const {
+    JIARRAY_HD inline this_type operator-(const this_type& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         this_type result;
         result.initByRankSize(getSize(), getRankSize(), getOffset());
@@ -1184,7 +1253,7 @@ public:
      * @return New array with negated elements
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    friend inline this_type operator-(const this_type& array) {
+    JIARRAY_HD friend inline this_type operator-(const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
         JIARRAY_SIMD_LOOP
@@ -1200,7 +1269,7 @@ public:
      * @return Reference to this array
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type& operator*=(const T& val) {
+    JIARRAY_HD inline this_type& operator*=(const T& val) {
         JIARRAY_SIMD_LOOP
         for (int i = 0; i < nn; ++i) {
             mm[i] *= val;
@@ -1214,7 +1283,7 @@ public:
      * @return Reference to this array
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type& operator*=(const this_type& array) {
+    JIARRAY_HD inline this_type& operator*=(const this_type& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         JIARRAY_SIMD_LOOP
         for (int i = 0; i < nn; ++i) {
@@ -1229,7 +1298,7 @@ public:
      * @return New array containing product
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type operator*(const this_type& array) const {
+    JIARRAY_HD inline this_type operator*(const this_type& array) const {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         this_type result;
         result.initByRankSize(getSize(), getRankSize(), getOffset());
@@ -1246,7 +1315,7 @@ public:
      * @note For floating-point types, uses reciprocal multiplication for performance
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline void operator/=(const T& val) {
+    JIARRAY_HD inline void operator/=(const T& val) {
         static_assert(std::is_floating_point_v<T> || std::is_integral_v<T>,
                       "Division requires arithmetic type");
         if constexpr (std::is_floating_point_v<T>) {
@@ -1269,7 +1338,7 @@ public:
      * @return Reference to this array
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline this_type& operator/=(const this_type& array) {
+    JIARRAY_HD inline this_type& operator/=(const this_type& array) {
         JIARRAY_CHECK_SIZE(nn, array.nn);
         JIARRAY_SIMD_LOOP
         for (int i = 0; i < nn; ++i) {
@@ -1285,7 +1354,7 @@ public:
      * @return New array containing quotient
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    friend inline this_type operator/(const this_type& lhs, const this_type& rhs) {
+    JIARRAY_HD friend inline this_type operator/(const this_type& lhs, const this_type& rhs) {
         JIARRAY_CHECK_SIZE(lhs.nn, rhs.nn);
         this_type result;
         result.initByRankSize(lhs.getSize(), lhs.getRankSize(), lhs.getOffset());
@@ -1309,7 +1378,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator+(const Scalar& val, const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1322,7 +1391,7 @@ public:
 
     /// @overload
     template <typename Scalar>
-    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator+(const this_type& array, const Scalar& val) {
         return val + array;
     }
@@ -1336,7 +1405,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator*(const Scalar& val, const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1349,7 +1418,7 @@ public:
 
     /// @overload
     template <typename Scalar>
-    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator*(const this_type& array, const Scalar& val) {
         return val * array;
     }
@@ -1363,7 +1432,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator/(const Scalar& val, const this_type& array) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1383,7 +1452,7 @@ public:
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
     template <typename Scalar>
-    friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
+    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
     operator/(const this_type& array, const Scalar& val) {
         this_type result;
         result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
@@ -1413,7 +1482,7 @@ public:
      * @note Returns double for numerical stability
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    inline double sqsum() const {
+    JIARRAY_HD inline double sqsum() const {
         double result = 0;
         JIARRAY_SIMD_REDUCTION(+, result)
         for (int i = 0; i < nn; ++i) {
@@ -1430,7 +1499,7 @@ public:
      * @note Arrays must have same dimensions and offsets
      * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
      */
-    friend inline T dot(const this_type& array1, const this_type& array2) {
+    JIARRAY_HD friend inline T dot(const this_type& array1, const this_type& array2) {
         JIARRAY_CHECK_SIZE(array1.nn, array2.nn);
         for (int rank = 0; rank < RANK; ++rank) {
             assert(array1.sizes[rank] == array2.sizes[rank]);
@@ -1454,7 +1523,7 @@ public:
      * @param item Value to search for
      * @return true if item is found
      */
-    inline bool contains(const T& item) const {
+    JIARRAY_HD inline bool contains(const T& item) const {
         return std::find(mm, mm + nn, item) != (mm + nn);
     }
 
@@ -1464,7 +1533,7 @@ public:
      * @return For 1D: linear index; For ND: FastArray with multidimensional indices
      * @note Returns offset-adjusted indices, or -1+OFFSET if not found
      */
-    inline auto findFirst(const T& item) const {
+    JIARRAY_HD inline auto findFirst(const T& item) const {
         if constexpr (RANK == 1) {
             auto it = std::find(mm, mm + nn, item);
             if (it == mm + nn)
@@ -1501,7 +1570,7 @@ public:
      * @brief Find location of maximum element
      * @return FastArray containing multidimensional indices of maximum element
      */
-    inline FastArray<int, RANK> maxloc() const {
+    JIARRAY_HD inline FastArray<int, RANK> maxloc() const {
         assert(nn > 0);
         auto it     = std::max_element(mm, mm + nn);
         int  maxloc = static_cast<int>(std::distance(mm, it));
@@ -1529,7 +1598,7 @@ public:
      * @param to End index (exclusive or inclusive depending on JIARRAY_OFFSET)
      * @return FastArray containing multidimensional indices of maximum element
      */
-    inline FastArray<int, RANK> maxloc(int from, int to) const {
+    JIARRAY_HD inline FastArray<int, RANK> maxloc(int from, int to) const {
         assert(from >= JIARRAY_OFFSET && to <= nn + JIARRAY_OFFSET);
         auto it     = std::max_element(mm + from - JIARRAY_OFFSET, mm + to - JIARRAY_OFFSET);
         int  maxloc = static_cast<int>(std::distance(mm, it));
@@ -1557,7 +1626,7 @@ public:
      * @brief Create a deep copy of the array
      * @return New array with copied data
      */
-    inline this_type copy() const {
+    JIARRAY_HD inline this_type copy() const {
         this_type array;
         array = *this;
         return array;
@@ -1568,7 +1637,7 @@ public:
      * @param array Source array to share memory with
      * @note This array must not be allocated before calling shareWith
      */
-    inline void shareWith(const this_type& array) {
+    JIARRAY_HD inline void shareWith(const this_type& array) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
         nn = array.nn;
@@ -1584,7 +1653,7 @@ public:
      * @brief Convert array to std::vector
      * @return Vector containing copy of all elements
      */
-    inline std::vector<T> convertToVector() const {
+    JIARRAY_HD inline std::vector<T> convertToVector() const {
         return std::vector<T>(mm, mm + nn);
     }
 
@@ -1608,81 +1677,81 @@ public:
         using pointer           = T*;
         using reference         = T&;
 
-        constexpr explicit Iterator(pointer ptr) noexcept : m_ptr(ptr) {
+        JIARRAY_HD constexpr explicit Iterator(pointer ptr) noexcept : m_ptr(ptr) {
         }
 
         // Arithmetic operators
-        constexpr Iterator operator+(difference_type n) const noexcept {
+        JIARRAY_HD constexpr Iterator operator+(difference_type n) const noexcept {
             return Iterator(m_ptr + n);
         }
-        constexpr Iterator operator-(difference_type n) const noexcept {
+        JIARRAY_HD constexpr Iterator operator-(difference_type n) const noexcept {
             return Iterator(m_ptr - n);
         }
 
-        constexpr Iterator& operator+=(difference_type n) noexcept {
+        JIARRAY_HD constexpr Iterator& operator+=(difference_type n) noexcept {
             m_ptr += n;
             return *this;
         }
-        constexpr Iterator& operator-=(difference_type n) noexcept {
+        JIARRAY_HD constexpr Iterator& operator-=(difference_type n) noexcept {
             m_ptr -= n;
             return *this;
         }
 
-        constexpr reference operator[](difference_type n) noexcept {
+        JIARRAY_HD constexpr reference operator[](difference_type n) noexcept {
             return *(m_ptr + n);
         }
 
-        constexpr difference_type operator-(const Iterator& other) const noexcept {
+        JIARRAY_HD constexpr difference_type operator-(const Iterator& other) const noexcept {
             return m_ptr - other.m_ptr;
         }
 
         // Comparison operators
-        constexpr bool operator<(const Iterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator<(const Iterator& other) const noexcept {
             return m_ptr < other.m_ptr;
         }
-        constexpr bool operator<=(const Iterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator<=(const Iterator& other) const noexcept {
             return m_ptr <= other.m_ptr;
         }
-        constexpr bool operator>(const Iterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator>(const Iterator& other) const noexcept {
             return m_ptr > other.m_ptr;
         }
-        constexpr bool operator>=(const Iterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator>=(const Iterator& other) const noexcept {
             return m_ptr >= other.m_ptr;
         }
 
         // Dereference operators
-        constexpr reference operator*() const noexcept {
+        JIARRAY_HD constexpr reference operator*() const noexcept {
             return *m_ptr;
         }
-        constexpr pointer operator->() const noexcept {
+        JIARRAY_HD constexpr pointer operator->() const noexcept {
             return m_ptr;
         }
 
         // Increment/decrement operators
-        constexpr Iterator& operator++() noexcept {
+        JIARRAY_HD constexpr Iterator& operator++() noexcept {
             ++m_ptr;
             return *this;
         }
-        constexpr Iterator operator++(int) noexcept {
+        JIARRAY_HD constexpr Iterator operator++(int) noexcept {
             Iterator tmp = *this;
             ++(*this);
             return tmp;
         }
-        constexpr Iterator& operator--() noexcept {
+        JIARRAY_HD constexpr Iterator& operator--() noexcept {
             --m_ptr;
             return *this;
         }
-        constexpr Iterator operator--(int) noexcept {
+        JIARRAY_HD constexpr Iterator operator--(int) noexcept {
             Iterator tmp = *this;
             --(*this);
             return tmp;
         }
 
         // Equality operators
-        friend constexpr bool operator==(const Iterator& a, const Iterator& b) noexcept {
+        JIARRAY_HD friend constexpr bool operator==(const Iterator& a, const Iterator& b) noexcept {
             return a.m_ptr == b.m_ptr;
         }
-        friend constexpr bool operator!=(const Iterator& a, const Iterator& b) noexcept {
+        JIARRAY_HD friend constexpr bool operator!=(const Iterator& a, const Iterator& b) noexcept {
             return a.m_ptr != b.m_ptr;
         }
 
@@ -1702,85 +1771,85 @@ public:
         using pointer           = const T*;
         using reference         = const T&;
 
-        constexpr explicit ConstIterator(pointer ptr) noexcept : m_ptr(ptr) {
+        JIARRAY_HD constexpr explicit ConstIterator(pointer ptr) noexcept : m_ptr(ptr) {
         }
 
         // Allow implicit conversion from Iterator to ConstIterator
-        constexpr ConstIterator(const Iterator& it) noexcept : m_ptr(&(*it)) {
+        JIARRAY_HD constexpr ConstIterator(const Iterator& it) noexcept : m_ptr(&(*it)) {
         }
 
         // Arithmetic operators
-        constexpr ConstIterator operator+(difference_type n) const noexcept {
+        JIARRAY_HD constexpr ConstIterator operator+(difference_type n) const noexcept {
             return ConstIterator(m_ptr + n);
         }
-        constexpr ConstIterator operator-(difference_type n) const noexcept {
+        JIARRAY_HD constexpr ConstIterator operator-(difference_type n) const noexcept {
             return ConstIterator(m_ptr - n);
         }
 
-        constexpr ConstIterator& operator+=(difference_type n) noexcept {
+        JIARRAY_HD constexpr ConstIterator& operator+=(difference_type n) noexcept {
             m_ptr += n;
             return *this;
         }
-        constexpr ConstIterator& operator-=(difference_type n) noexcept {
+        JIARRAY_HD constexpr ConstIterator& operator-=(difference_type n) noexcept {
             m_ptr -= n;
             return *this;
         }
 
-        constexpr reference operator[](difference_type n) const noexcept {
+        JIARRAY_HD constexpr reference operator[](difference_type n) const noexcept {
             return *(m_ptr + n);
         }
 
-        constexpr difference_type operator-(const ConstIterator& other) const noexcept {
+        JIARRAY_HD constexpr difference_type operator-(const ConstIterator& other) const noexcept {
             return m_ptr - other.m_ptr;
         }
 
         // Comparison operators
-        constexpr bool operator<(const ConstIterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator<(const ConstIterator& other) const noexcept {
             return m_ptr < other.m_ptr;
         }
-        constexpr bool operator<=(const ConstIterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator<=(const ConstIterator& other) const noexcept {
             return m_ptr <= other.m_ptr;
         }
-        constexpr bool operator>(const ConstIterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator>(const ConstIterator& other) const noexcept {
             return m_ptr > other.m_ptr;
         }
-        constexpr bool operator>=(const ConstIterator& other) const noexcept {
+        JIARRAY_HD constexpr bool operator>=(const ConstIterator& other) const noexcept {
             return m_ptr >= other.m_ptr;
         }
 
         // Dereference operators - const만!
-        constexpr reference operator*() const noexcept {
+        JIARRAY_HD constexpr reference operator*() const noexcept {
             return *m_ptr;
         }
-        constexpr pointer operator->() const noexcept {
+        JIARRAY_HD constexpr pointer operator->() const noexcept {
             return m_ptr;
         }
 
         // Increment/decrement operators
-        constexpr ConstIterator& operator++() noexcept {
+        JIARRAY_HD constexpr ConstIterator& operator++() noexcept {
             ++m_ptr;
             return *this;
         }
-        constexpr ConstIterator operator++(int) noexcept {
+        JIARRAY_HD constexpr ConstIterator operator++(int) noexcept {
             ConstIterator tmp = *this;
             ++(*this);
             return tmp;
         }
-        constexpr ConstIterator& operator--() noexcept {
+        JIARRAY_HD constexpr ConstIterator& operator--() noexcept {
             --m_ptr;
             return *this;
         }
-        constexpr ConstIterator operator--(int) noexcept {
+        JIARRAY_HD constexpr ConstIterator operator--(int) noexcept {
             ConstIterator tmp = *this;
             --(*this);
             return tmp;
         }
 
         // Equality operators
-        friend constexpr bool operator==(const ConstIterator& a, const ConstIterator& b) noexcept {
+        JIARRAY_HD friend constexpr bool operator==(const ConstIterator& a, const ConstIterator& b) noexcept {
             return a.m_ptr == b.m_ptr;
         }
-        friend constexpr bool operator!=(const ConstIterator& a, const ConstIterator& b) noexcept {
+        JIARRAY_HD friend constexpr bool operator!=(const ConstIterator& a, const ConstIterator& b) noexcept {
             return a.m_ptr != b.m_ptr;
         }
 
@@ -1790,25 +1859,60 @@ public:
 
     /// @name Iterator access
     /// @{
-    Iterator begin() noexcept {
+    JIARRAY_HD Iterator begin() noexcept {
         return Iterator(mm);
     }
-    Iterator end() noexcept {
+    JIARRAY_HD Iterator end() noexcept {
         return Iterator(mm + nn);
     }
-    ConstIterator begin() const noexcept {
+    JIARRAY_HD ConstIterator begin() const noexcept {
         return ConstIterator(mm);
     }
-    ConstIterator end() const noexcept {
+    JIARRAY_HD ConstIterator end() const noexcept {
         return ConstIterator(mm + nn);
     }
-    ConstIterator cbegin() const noexcept {
+    JIARRAY_HD ConstIterator cbegin() const noexcept {
         return ConstIterator(mm);
     }
-    ConstIterator cend() const noexcept {
+    JIARRAY_HD ConstIterator cend() const noexcept {
         return ConstIterator(mm + nn);
     }
     /// @}
+
+    // ========================================================================
+    // Cereal serialization
+    // ========================================================================
+#ifdef JIARRAY_CEREAL
+public:
+    template <class Archive>
+    void serialize(Archive& ar) {
+        static_assert(!std::is_pointer_v<T>, "JIArray does not support serialization for pointer types");
+
+        if constexpr (Archive::is_loading::value) {
+            if (allocated == JIARRAY_ALLOCATED_ALL) {
+                destroy();
+            }
+        }
+
+        ar(nn, rankSize, offset, sumOfOffset, sizes, allocated);
+
+        if constexpr (Archive::is_saving::value) {
+            if (nn == 0) return;
+        }
+
+        if constexpr (Archive::is_loading::value) {
+            mm = new T[nn]{};
+        }
+
+        if constexpr (std::is_arithmetic_v<T>) {
+            ar(cereal::binary_data(mm, nn * sizeof(T)));
+        } else {
+            for (int i = 0; i < nn; i++) {
+                ar(mm[i]);
+            }
+        }
+    }
+#endif
 };
 
 // ============================================================================
