@@ -63,3 +63,23 @@ TEST(Ffor, IterationCountMatchesStep) {
     ffor(i, 0, 100, 7) ++count;
     EXPECT_EQ(count, 15);  // 0,7,14,...,98 → 15 values
 }
+
+TEST(Ffor, BreakConditionInEndExpression) {
+    // Some call sites lean on operator precedence (`<=` binds tighter
+    // than `&&`) to write break-conditions:
+    //
+    //     ffor(i, 1, count && !found) { ... }
+    //
+    // expands to `for (int i = 1; i <= count && !found; ++i)`, i.e.
+    // `(i <= count) && !found`.  If the macro paren-wrapped `end` it
+    // would silently become `i <= (count && !found)` and stop after
+    // one iteration.  This test pins the precedence-sensitive form.
+    bool found = false;
+    int count = 5;
+    int visits = 0;
+    ffor(i, 1, count && !found) {
+        ++visits;
+        if (i == 3) found = true;  // exit after the 3rd iteration
+    }
+    EXPECT_EQ(visits, 3);
+}

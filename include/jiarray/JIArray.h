@@ -2003,12 +2003,18 @@ public:
 #define GET_STEP_IMPL(_1, _2, ...) _2
 #define GET_STEP(...)              GET_STEP_IMPL(0 __VA_OPT__(, ) __VA_ARGS__, 1)
 
+// Note: `begin` and `end` are NOT paren-wrapped on purpose.  Existing
+// call sites use the implicit `<=` > `&&` precedence to write
+// break-conditions like `zfor(i, count && !found)`, which would silently
+// change meaning if we wrapped `(count && !found)` and bound it tighter
+// than the comparison.  Step is single-token (an integer literal in
+// every call site), so leaving it bare is also safe.
 #if JIARRAY_OFFSET == 0
-    #define ffor(i, begin, end, ...)      for (int i = (begin); i < (end);  i += GET_STEP(__VA_ARGS__))
-    #define ffor_back(i, begin, end, ...) for (int i = (begin); i >= (end); i -= GET_STEP(__VA_ARGS__))
+    #define ffor(i, begin, end, ...)      for (int i = begin; i < end;  i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
 #else
-    #define ffor(i, begin, end, ...)      for (int i = (begin); i <= (end); i += GET_STEP(__VA_ARGS__))
-    #define ffor_back(i, begin, end, ...) for (int i = (begin); i >= (end); i -= GET_STEP(__VA_ARGS__))
+    #define ffor(i, begin, end, ...)      for (int i = begin; i <= end; i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
 #endif
 
 /**
