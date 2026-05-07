@@ -11,6 +11,13 @@ target_include_directories(dnegri.jiarray INTERFACE
 )
 add_library(jiarray ALIAS dnegri.jiarray)
 
+# `ffor(i, b, e, step)` in JIArray.h uses C++20 __VA_OPT__, which on
+# MSVC requires the conforming preprocessor.  Propagate the flag to
+# every consumer that links jiarray; it is a no-op on GCC / Clang.
+if (MSVC)
+    target_compile_options(dnegri.jiarray INTERFACE /Zc:preprocessor)
+endif()
+
 option(JIARRAY_BUILD_TESTS "Build jiarray tests" ${PROJECT_IS_TOP_LEVEL})
 
 if(JIARRAY_BUILD_TESTS)
@@ -64,6 +71,7 @@ if(JIARRAY_BUILD_TESTS)
     _ji_add_gtest(jivector_test            ./test/jivector_test.cpp)
     _ji_add_gtest(jiarray_coverage_test    ./test/jiarray_coverage_test.cpp)
     _ji_add_gtest(move_lifecycle_test      ./test/move_lifecycle_test.cpp)
+    _ji_add_gtest(ffor_test                ./test/ffor_test.cpp)
 
     # Column-major (default) + row-major variants of the main matrix suite
     _ji_add_gtest(column_major_test        ./test/column_major_test.cpp)

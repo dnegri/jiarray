@@ -1984,16 +1984,31 @@ public:
  * @param end End index (inclusive for 1-based, exclusive for 0-based)
  * @param step Step size (optional, defaults to 1)
  */
-// Helper macro to get optional step parameter (defaults to 1)
-#define GET_STEP_IMPL(_1, _2, N, ...) N
-#define GET_STEP(...)                 GET_STEP_IMPL(__VA_ARGS__, __VA_ARGS__, 1)
+// Pick the user-supplied step argument when present, otherwise fall
+// back to 1. Uses C++20 __VA_OPT__ so `ffor(i, b, e, 2)` walks i += 2
+// and `ffor(i, b, e)` walks i += 1.
+//
+// The previous position-counting trick — GET_STEP_IMPL(_1,_2,N,...) N
+// with GET_STEP(...) = GET_STEP_IMPL(__VA_ARGS__, __VA_ARGS__, 1) —
+// silently expanded `GET_STEP(2)` to `GET_STEP_IMPL(2, 2, 1)` and picked
+// the third position (= the fallback `1`), so a single user-supplied
+// step value was always ignored.
+//
+// Compiler requirements:
+//   - GCC ≥ 10  (default)
+//   - Clang ≥ 10 (default)
+//   - MSVC ≥ 19.30 (VS 2022) with /Zc:preprocessor or /std:c++20
+//     The INTERFACE flag in the project's CMakeLists adds
+//     /Zc:preprocessor for every consumer automatically.
+#define GET_STEP_IMPL(_1, _2, ...) _2
+#define GET_STEP(...)              GET_STEP_IMPL(0 __VA_OPT__(, ) __VA_ARGS__, 1)
 
 #if JIARRAY_OFFSET == 0
-    #define ffor(i, begin, end, ...)      for (int i = begin; i < end; i += GET_STEP(__VA_ARGS__))
-    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
+    #define ffor(i, begin, end, ...)      for (int i = (begin); i < (end);  i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...) for (int i = (begin); i >= (end); i -= GET_STEP(__VA_ARGS__))
 #else
-    #define ffor(i, begin, end, ...)      for (int i = begin; i <= end; i += GET_STEP(__VA_ARGS__))
-    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
+    #define ffor(i, begin, end, ...)      for (int i = (begin); i <= (end); i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...) for (int i = (begin); i >= (end); i -= GET_STEP(__VA_ARGS__))
 #endif
 
 /**
