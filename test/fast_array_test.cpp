@@ -275,24 +275,31 @@ TEST(FastArray2DTest, ScalarFillConstructor) {
 }
 
 TEST(FastArray2DTest, InitializerListConstructor) {
-    // 2x3 column-major: mm stores [col1_row1, col1_row2, col2_row1, col2_row2, col3_row1, col3_row2]
+    // Initializer list fills mm[] in declared order.  How (i,j) maps to mm
+    // depends on storage order, so check whichever layout was compiled in.
     FastArray2D<int, 2, 3> arr({1, 2, 3, 4, 5, 6});
-    // Column-major layout: (i,j) maps to mm[(j-1)*SIZE1 + (i-1)]
-    EXPECT_EQ(arr(1, 1), 1); // mm[0]
-    EXPECT_EQ(arr(2, 1), 2); // mm[1]
-    EXPECT_EQ(arr(1, 2), 3); // mm[2]
-    EXPECT_EQ(arr(2, 2), 4); // mm[3]
-    EXPECT_EQ(arr(1, 3), 5); // mm[4]
-    EXPECT_EQ(arr(2, 3), 6); // mm[5]
+    if (arr.is_row_major) {
+        // row-major: (i,j) → mm[(i-1)*3 + (j-1)]
+        EXPECT_EQ(arr(1, 1), 1); EXPECT_EQ(arr(1, 2), 2); EXPECT_EQ(arr(1, 3), 3);
+        EXPECT_EQ(arr(2, 1), 4); EXPECT_EQ(arr(2, 2), 5); EXPECT_EQ(arr(2, 3), 6);
+    } else {
+        // column-major: (i,j) → mm[(j-1)*2 + (i-1)]
+        EXPECT_EQ(arr(1, 1), 1); EXPECT_EQ(arr(2, 1), 2);
+        EXPECT_EQ(arr(1, 2), 3); EXPECT_EQ(arr(2, 2), 4);
+        EXPECT_EQ(arr(1, 3), 5); EXPECT_EQ(arr(2, 3), 6);
+    }
 }
 
 TEST(FastArray2DTest, CArrayConstructor) {
     int raw[] = {10, 20, 30, 40};
     FastArray2D<int, 2, 2> arr(raw);
-    EXPECT_EQ(arr(1, 1), 10);
-    EXPECT_EQ(arr(2, 1), 20);
-    EXPECT_EQ(arr(1, 2), 30);
-    EXPECT_EQ(arr(2, 2), 40);
+    if (arr.is_row_major) {
+        EXPECT_EQ(arr(1, 1), 10); EXPECT_EQ(arr(1, 2), 20);
+        EXPECT_EQ(arr(2, 1), 30); EXPECT_EQ(arr(2, 2), 40);
+    } else {
+        EXPECT_EQ(arr(1, 1), 10); EXPECT_EQ(arr(2, 1), 20);
+        EXPECT_EQ(arr(1, 2), 30); EXPECT_EQ(arr(2, 2), 40);
+    }
 }
 
 TEST(FastArray2DTest, ElementAccessAndModification) {
@@ -465,4 +472,151 @@ TEST(TypeAliasTest, Double2DAliases) {
     fdouble2d<2, 2> arr({1.0, 2.0, 3.0, 4.0});
     EXPECT_DOUBLE_EQ(arr(1, 1), 1.0);
     EXPECT_DOUBLE_EQ(arr(2, 2), 4.0);
+}
+
+// ============================================================================
+// 0.8.0+ unified API: variadic aliases (fint<...>, fdouble<...>, ...),
+// equality operators, 3D rank, and storage-layout verification.
+// ============================================================================
+
+TEST(VariadicAliasTest, OneDimensionalFint) {
+    fint<5> v({10, 20, 30, 40, 50});
+    EXPECT_EQ(v.RANK, 1u);
+    EXPECT_EQ(v.SIZE, 5u);
+    for (int i = 1; i <= 5; ++i) EXPECT_EQ(v(i), i * 10);
+}
+
+TEST(VariadicAliasTest, TwoDimensionalFint) {
+    fint<3, 2> m(0);
+    EXPECT_EQ(m.RANK, 2u);
+    EXPECT_EQ(m.SIZE, 6u);
+    m(1, 1) = 11;
+    m(3, 2) = 32;
+    EXPECT_EQ(m(1, 1), 11);
+    EXPECT_EQ(m(3, 2), 32);
+}
+
+TEST(VariadicAliasTest, ThreeDimensionalFdouble) {
+    fdouble<2, 3, 4> cube(0.0);
+    EXPECT_EQ(cube.RANK, 3u);
+    EXPECT_EQ(cube.SIZE, 24u);
+    cube(2, 3, 4) = 99.5;
+    EXPECT_DOUBLE_EQ(cube(2, 3, 4), 99.5);
+}
+
+TEST(VariadicAliasTest, FstringAndFarray) {
+    fstring<3> names({"a", "b", "c"});
+    EXPECT_EQ(names(1), "a");
+    EXPECT_EQ(names(3), "c");
+
+    farray<unsigned, 4> u({1u, 2u, 3u, 4u});
+    EXPECT_EQ(u(2), 2u);
+}
+
+// ----------------- Equality -----------------
+
+TEST(EqualityTest, FastArray1DEqual) {
+    fint<4> a({1, 2, 3, 4});
+    fint<4> b({1, 2, 3, 4});
+    EXPECT_TRUE(a == b);
+    EXPECT_FALSE(a != b);
+}
+
+TEST(EqualityTest, FastArray1DDifferentMiddle) {
+    fint<4> a({1, 2, 3, 4});
+    fint<4> b({1, 9, 3, 4});
+    EXPECT_FALSE(a == b);
+    EXPECT_TRUE(a != b);
+}
+
+TEST(EqualityTest, FastArray2DEqual) {
+    fint<2, 3> a(0);
+    fint<2, 3> b(0);
+    a(1, 1) = 7; b(1, 1) = 7;
+    a(2, 3) = 8; b(2, 3) = 8;
+    EXPECT_TRUE(a == b);
+
+    b(2, 3) = 0;
+    EXPECT_FALSE(a == b);
+}
+
+TEST(EqualityTest, StringFastArrayEqual) {
+    fstring<3> a({"x", "y", "z"});
+    fstring<3> b({"x", "y", "z"});
+    fstring<3> c({"x", "y", "Z"});
+    EXPECT_TRUE(a == b);
+    EXPECT_FALSE(a == c);
+}
+
+// ----------------- 3D access -----------------
+
+TEST(VariadicAliasTest, ThreeDimensionalLinearLayout) {
+    // Write every cell with a unique value and read back to confirm
+    // operator() and operator[] are consistent.
+    fint<2, 3, 4> a(0);
+    int n = 0;
+    for (int k = 1; k <= 4; ++k)
+        for (int j = 1; j <= 3; ++j)
+            for (int i = 1; i <= 2; ++i)
+                a(i, j, k) = ++n;
+
+    EXPECT_EQ(a.SIZE, 24u);
+    // Flat-iterate via operator[] and confirm we hit every value once.
+    long sum = 0;
+    for (std::size_t flat = 0; flat < a.SIZE; ++flat) sum += a[flat];
+    EXPECT_EQ(sum, 24L * 25L / 2L);  // 1+2+...+24
+}
+
+// ----------------- Storage order (compile-time check) -----------------
+
+TEST(StorageOrderTest, MatchesJiarrayMacro) {
+    // Confirm the static flag is consistent with the global macro.
+    constexpr bool expected_row_major = (JIARRAY_COLUMN_MAJOR == 0);
+    constexpr bool actual             = fint<2, 2>::is_row_major;
+    EXPECT_EQ(actual, expected_row_major);
+}
+
+TEST(StorageOrderTest, ColumnMajorStrideOrder) {
+    // For a (3 rows × 2 cols) array under column-major, incrementing the
+    // *first* index moves by 1 in flat memory; incrementing the second
+    // moves by 3.  Under row-major the roles swap.
+    fint<3, 2> a(0);
+    a(1, 1) = 100;
+    a(2, 1) = 200;
+    a(1, 2) = 300;
+
+    if (a.is_row_major) {
+        // row-major: a(i,j) at flat = (i-OFFSET) * 2 + (j-OFFSET)
+        EXPECT_EQ(a[0], 100);  // (1,1)
+        EXPECT_EQ(a[1], 300);  // (1,2)
+        EXPECT_EQ(a[2], 200);  // (2,1)
+    } else {
+        // column-major: a(i,j) at flat = (i-OFFSET) + (j-OFFSET) * 3
+        EXPECT_EQ(a[0], 100);  // (1,1)
+        EXPECT_EQ(a[1], 200);  // (2,1)
+        EXPECT_EQ(a[3], 300);  // (1,2)
+    }
+}
+
+TEST(StorageOrderTest, ThreeDStrides) {
+    // Spot-check that 3D access agrees with the layout-implied strides.
+    fint<2, 3, 4> a(0);
+    a(1, 1, 1) = 1;
+    a(2, 1, 1) = 2;
+    a(1, 2, 1) = 3;
+    a(1, 1, 2) = 4;
+
+    if (a.is_row_major) {
+        // strides (row-major): [3*4, 4, 1]  →  i*12 + j*4 + k
+        EXPECT_EQ(a[0], 1);   // (1,1,1)
+        EXPECT_EQ(a[12], 2);  // (2,1,1) → stride 12
+        EXPECT_EQ(a[4], 3);   // (1,2,1) → stride 4
+        EXPECT_EQ(a[1], 4);   // (1,1,2) → stride 1
+    } else {
+        // strides (column-major): [1, 2, 6]  →  i + j*2 + k*6
+        EXPECT_EQ(a[0], 1);   // (1,1,1)
+        EXPECT_EQ(a[1], 2);   // (2,1,1) → stride 1
+        EXPECT_EQ(a[2], 3);   // (1,2,1) → stride 2
+        EXPECT_EQ(a[6], 4);   // (1,1,2) → stride 6
+    }
 }

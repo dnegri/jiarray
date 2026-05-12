@@ -68,6 +68,9 @@ if(JIARRAY_BUILD_TESTS)
     endfunction()
 
     _ji_add_gtest(fast_array_test          ./test/fast_array_test.cpp)
+    _ji_add_gtest(fast_array_rowmajor_test ./test/fast_array_test.cpp)
+    target_compile_options(${PROJECT_NAME}.fast_array_rowmajor_test
+      PRIVATE -DJIARRAY_COLUMN_MAJOR=0)
     _ji_add_gtest(jivector_test            ./test/jivector_test.cpp)
     _ji_add_gtest(jiarray_coverage_test    ./test/jiarray_coverage_test.cpp)
     _ji_add_gtest(move_lifecycle_test      ./test/move_lifecycle_test.cpp)
