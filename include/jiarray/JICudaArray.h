@@ -782,6 +782,7 @@ public:
     }
 
     void flush(int deviceId) const {
+        if (mm == nullptr || nn <= 0) return;
         cudaMemPrefetchAsync(mm, nn * sizeof(T), deviceId);
     }
 
