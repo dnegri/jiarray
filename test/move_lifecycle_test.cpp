@@ -419,6 +419,97 @@ TEST(RealWorld, VectorOfStructResizingForcesMoveNotCopy) {
 }
 
 // ---------------------------------------------------------------------------
+// 11. slice() = <rvalue> must write THROUGH the view (regression)
+//
+// `slice()` returns an rvalue, non-owning view temporary.  When the RHS is
+// also an rvalue (another slice, or an arithmetic expression), overload
+// resolution would otherwise pick move assignment, which steals a pointer
+// into the doomed LHS temporary and never touches the underlying buffer —
+// leaving it as garbage.  This was the sphincs depletion keff-collapse bug:
+// DepletionRunner::depleteFPCM did `pflux0.slice(lfb,k) = ...` and pflux0 was
+// never written, so the corrector re-depleted on garbage flux.
+// The lvalue-ref-qualifier (`&`) on move assign forces these to copy assign.
+// ---------------------------------------------------------------------------
+
+// Mirror of DepletionRunner line 196: pflux0.slice(lfb,k) = s.pflux.slice(lfb,k);
+TEST(SliceAssign, SliceFromSliceWritesThrough) {
+    zfloat4 pflux0; pflux0.init0(1, 2, 1, 3, 1, 4, 1, 5);   // (ng,nbox,nfb,k)
+    zfloat4 pflux;  pflux.init0(1, 2, 1, 3, 1, 4, 1, 5);
+    pflux0 = -1.0f;
+    pflux  = 7.0f;
+
+    for (int k = 1; k <= 5; ++k)
+        for (int lfb = 1; lfb <= 4; ++lfb)
+            pflux0.slice(lfb, k) = pflux.slice(lfb, k);   // must element-copy
+
+    for (int k = 1; k <= 5; ++k)
+        for (int lfb = 1; lfb <= 4; ++lfb)
+            for (int n = 1; n <= 3; ++n)
+                for (int g = 1; g <= 2; ++g)
+                    EXPECT_FLOAT_EQ(pflux0(g, n, lfb, k), 7.0f);
+}
+
+// Mirror of DepletionRunner line 211 (the killer): the RHS is an *owning*
+// arithmetic temporary, yet the LHS view must still receive the values.
+TEST(SliceAssign, SliceFromArithmeticWritesThrough) {
+    zfloat4 pflux0; pflux0.init0(1, 2, 1, 3, 1, 4, 1, 5);
+    zfloat4 pflux;  pflux.init0(1, 2, 1, 3, 1, 4, 1, 5);
+    pflux0 = 4.0f;
+    pflux  = 10.0f;
+
+    for (int k = 1; k <= 5; ++k)
+        for (int lfb = 1; lfb <= 4; ++lfb)
+            pflux0.slice(lfb, k) =
+                (pflux0.slice(lfb, k) + pflux.slice(lfb, k)) * 0.5f;   // (4+10)/2 = 7
+
+    for (int k = 1; k <= 5; ++k)
+        for (int lfb = 1; lfb <= 4; ++lfb)
+            for (int n = 1; n <= 3; ++n)
+                for (int g = 1; g <= 2; ++g)
+                    EXPECT_FLOAT_EQ(pflux0(g, n, lfb, k), 7.0f);
+}
+
+// Mirror of CMFD3D: ccr.slice(ir,l,k) = -offdiag;  (RHS = unary-negation rvalue)
+TEST(SliceAssign, SliceFromUnaryNegationWritesThrough) {
+    zdouble3 ccr; ccr.init(2, 3, 4); ccr = 0.0;
+    zdouble1 offdiag; offdiag.init(2); offdiag(1) = 5.0; offdiag(2) = 9.0;
+
+    ccr.slice(2, 3) = -offdiag;
+
+    EXPECT_DOUBLE_EQ(ccr(1, 2, 3), -5.0);
+    EXPECT_DOUBLE_EQ(ccr(2, 2, 3), -9.0);
+}
+
+// Ownership guard: owning lvalue assigned from an rvalue view copies elements
+// rather than stealing the view's (non-owning) pointer and orphaning its buffer.
+TEST(SliceAssign, OwningLhsFromViewCopiesNotSteals) {
+    zdouble1 owned; owned.init(4); owned = 1.0;
+    zdouble2 src;   src.init(4, 2); src = 0.0;
+    for (int i = 1; i <= 4; ++i) src(i, 1) = 9.0;
+
+    owned = src.slice(1);                 // rvalue view RHS, owning lvalue LHS
+
+    EXPECT_TRUE(owned.isAllocated());     // did not degrade into a view
+    for (int i = 1; i <= 4; ++i) EXPECT_DOUBLE_EQ(owned(i), 9.0);
+
+    src.destroy();                        // free the source buffer
+    for (int i = 1; i <= 4; ++i) EXPECT_DOUBLE_EQ(owned(i), 9.0);  // not orphaned
+}
+
+// Owning lvalue moved from a genuine owning rvalue still steals (optimization
+// preserved) — the guard must not turn legitimate moves into copies.
+TEST(SliceAssign, OwningLhsFromOwningRvalueStillMoves) {
+    zdouble1 dst; dst.init(3); dst = 0.0;
+    zdouble1 src; src.init(3); src = 5.0;
+    const double* src_mm = src.data();
+
+    dst = std::move(src);
+
+    EXPECT_EQ(dst.data(), src_mm);        // pointer transferred, not copied
+    EXPECT_EQ(src.data(), nullptr);
+}
+
+// ---------------------------------------------------------------------------
 // 8. Non-virtual destructor → sizeof sanity + no vptr
 // ---------------------------------------------------------------------------
 

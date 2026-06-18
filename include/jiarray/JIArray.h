@@ -858,6 +858,22 @@ JIARRAY_UNROLL
         return at(index...);
     }
 
+    // Concrete per-rank overloads: debugger expression evaluators (lldb/gdb)
+    // cannot deduce variadic-template calls, so a(i,j,k) in a Watch window
+    // needs these. Only the matching-rank overload is ever instantiated.
+    JIARRAY_HD inline T& operator()(int i) { return at(i); }
+    JIARRAY_HD inline T& operator()(int i, int j) { return at(i, j); }
+    JIARRAY_HD inline T& operator()(int i, int j, int k) { return at(i, j, k); }
+    JIARRAY_HD inline T& operator()(int i, int j, int k, int l) { return at(i, j, k, l); }
+    JIARRAY_HD inline T& operator()(int i, int j, int k, int l, int m) { return at(i, j, k, l, m); }
+    JIARRAY_HD inline T& operator()(int i, int j, int k, int l, int m, int n) { return at(i, j, k, l, m, n); }
+    JIARRAY_HD inline const T& operator()(int i) const { return at(i); }
+    JIARRAY_HD inline const T& operator()(int i, int j) const { return at(i, j); }
+    JIARRAY_HD inline const T& operator()(int i, int j, int k) const { return at(i, j, k); }
+    JIARRAY_HD inline const T& operator()(int i, int j, int k, int l) const { return at(i, j, k, l); }
+    JIARRAY_HD inline const T& operator()(int i, int j, int k, int l, int m) const { return at(i, j, k, l, m); }
+    JIARRAY_HD inline const T& operator()(int i, int j, int k, int l, int m, int n) const { return at(i, j, k, l, m, n); }
+
     /**
      * @brief Access element using FastArray index
      * @param idx FastArray containing indices
@@ -1069,9 +1085,25 @@ JIARRAY_UNROLL
      *       return-by-value into an already-initialised target and for
      *       vector/container-based storage of structs containing JIArray.
      *       After the move, `other` holds no memory.
+     * @note The lvalue ref-qualifier (`&`) is deliberate: it removes this
+     *       overload from consideration when `*this` is an rvalue — e.g.
+     *       `a.slice(i) = expr`, where `slice()` yields a temporary view.
+     *       Such an assignment falls through to copy assignment, which
+     *       writes element-wise through the view into the underlying buffer
+     *       instead of hijacking the doomed temporary's pointer.
      */
-    JIARRAY_HD inline this_type& operator=(this_type&& other) noexcept {
+    JIARRAY_HD inline this_type& operator=(this_type&& other) & noexcept {
         if (this == &other) return *this;
+
+        // Ownership guard: a non-owning `other` (view) has nothing to steal.
+        // If `this` already owns memory, copy elements through rather than
+        // adopting `other`'s pointer (which would orphan this->mm). `this`
+        // being already allocated means copy assignment takes the std::copy
+        // path with no reallocation, so `noexcept` is preserved.
+        if (other.allocated == JIARRAY_ALLOCATED_NONE &&
+            allocated      != JIARRAY_ALLOCATED_NONE) {
+            return operator=(static_cast<const this_type&>(other));
+        }
 
         destroy();
 
