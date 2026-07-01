@@ -1813,51 +1813,58 @@ public:
 // ============================================================================
 // Type aliases for convenience
 // ============================================================================
+//
+// These are namespaced `using` aliases (not preprocessor macros): they live in
+// `dnegri::jiarray`, respect scoping, appear in diagnostics/IDE tooling, and
+// cannot clobber unrelated identifiers named e.g. `zint1`. Reach them via
+// `using namespace dnegri::jiarray;` or qualification, like any other name here.
+// (Prior releases defined these as `#define zint1 JIArray<int,1>` — global,
+// unscoped, and collision-prone; replaced in this release.)
 
 /// @name Boolean array type aliases
 /// @{
-#define zbool1 JIArray<bool, 1>
-#define zbool2 JIArray<bool, 2>
-#define zbool3 JIArray<bool, 3>
-#define zbool4 JIArray<bool, 4>
-#define zbool5 JIArray<bool, 5>
+using zbool1 = JIArray<bool, 1>;
+using zbool2 = JIArray<bool, 2>;
+using zbool3 = JIArray<bool, 3>;
+using zbool4 = JIArray<bool, 4>;
+using zbool5 = JIArray<bool, 5>;
 /// @}
 
 /// @name Integer array type aliases
 /// @{
-#define zint1 JIArray<int, 1>
-#define zint2 JIArray<int, 2>
-#define zint3 JIArray<int, 3>
-#define zint4 JIArray<int, 4>
-#define zint5 JIArray<int, 5>
+using zint1 = JIArray<int, 1>;
+using zint2 = JIArray<int, 2>;
+using zint3 = JIArray<int, 3>;
+using zint4 = JIArray<int, 4>;
+using zint5 = JIArray<int, 5>;
 /// @}
 
 /// @name Double-precision floating-point array type aliases
 /// @{
-#define zdouble1 JIArray<double, 1>
-#define zdouble2 JIArray<double, 2>
-#define zdouble3 JIArray<double, 3>
-#define zdouble4 JIArray<double, 4>
-#define zdouble5 JIArray<double, 5>
-#define zdouble6 JIArray<double, 6>
+using zdouble1 = JIArray<double, 1>;
+using zdouble2 = JIArray<double, 2>;
+using zdouble3 = JIArray<double, 3>;
+using zdouble4 = JIArray<double, 4>;
+using zdouble5 = JIArray<double, 5>;
+using zdouble6 = JIArray<double, 6>;
 /// @}
 
 /// @name Single-precision floating-point array type aliases
 /// @{
-#define zfloat1 JIArray<float, 1>
-#define zfloat2 JIArray<float, 2>
-#define zfloat3 JIArray<float, 3>
-#define zfloat4 JIArray<float, 4>
-#define zfloat5 JIArray<float, 5>
+using zfloat1 = JIArray<float, 1>;
+using zfloat2 = JIArray<float, 2>;
+using zfloat3 = JIArray<float, 3>;
+using zfloat4 = JIArray<float, 4>;
+using zfloat5 = JIArray<float, 5>;
 /// @}
 
 /// @name String array type aliases
 /// @{
-#define zstring1 JIArray<std::string, 1>
-#define zstring2 JIArray<std::string, 2>
-#define zstring3 JIArray<std::string, 3>
-#define zstring4 JIArray<std::string, 4>
-#define zstring5 JIArray<std::string, 5>
+using zstring1 = JIArray<std::string, 1>;
+using zstring2 = JIArray<std::string, 2>;
+using zstring3 = JIArray<std::string, 3>;
+using zstring4 = JIArray<std::string, 4>;
+using zstring5 = JIArray<std::string, 5>;
 /// @}
 
 // ============================================================================

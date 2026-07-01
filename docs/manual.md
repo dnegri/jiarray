@@ -187,6 +187,11 @@ class JIArray;
 | `zstring1` .. `zstring5` | `JIArray<std::string, 1>` .. `JIArray<std::string, 5>` |
 | `zarray<T, N>` | `JIArray<T, N>` |
 
+These are namespaced `using` aliases in `dnegri::jiarray` — reach them via
+`using namespace dnegri::jiarray;` or qualification. (They were global preprocessor
+macros in prior releases; the change is source-compatible for code that already imports
+the namespace, and no longer collides with unrelated identifiers named e.g. `zint1`.)
+
 ### Construction
 
 ```cpp
