@@ -253,6 +253,53 @@ arr.isAllocated();  // true if array owns or references memory
 
 After `destroy()` or `erase()`, the array can be re-initialized with `init()`.
 
+### Memory Ownership & View Lifetime
+
+A `JIArray` is either an **owner** (it allocated its buffer and frees it on destruction)
+or a **non-owning view** (it points into memory owned by someone else). Getting this wrong
+is the main source of dangling reads, so the rules are explicit:
+
+| Operation | Result | Owns memory? |
+|---|---|---|
+| `zint1 a(n);` / `a.init(n)` | fresh allocation | **owner** |
+| `zint1 b(a);` (copy constructor) | **shallow view** aliasing `a` | no — view |
+| `b = a;` (copy assignment) | **deep copy** into `b` (allocates if empty) | owner |
+| `auto c = std::move(a);` | ownership transferred; `a` left empty | owner |
+| `a.slice(i)` / `a.reshape(...)` | **view** sharing `a`'s buffer | no — view |
+| `a.copy()` | explicit **deep copy** | owner |
+| `b.shareWith(a)` | explicit **view** of `a` | no — view |
+| `zdouble2 w(buf, r, c)` | wraps external `buf` | no — view |
+
+**A view must not outlive the owner of its memory.** Using a view after the owner is
+destroyed (or reallocated via `init`/`setSize`) is a use-after-free.
+
+```cpp
+zint1 make() { zint1 t{1,2,3}; return t.slice(0); }  // ✗ view into a buffer freed on return
+zint1 owner{1,2,3};
+zint1 v = owner.slice(1);   // ok while `owner` is alive
+owner.init(10);             // ✗ reallocates — `v` now dangles
+```
+
+**Two `auto` traps to know:**
+
+```cpp
+auto x = arr;        // ✗ copy constructor → x is a VIEW aliasing arr (not a copy!)
+zint1 x = arr.copy();// ✅ independent owner
+
+auto r = a + b;      // ✗ r is a lazy expression node holding refs to a,b (see Arithmetic)
+zint1 r = a + b;     // ✅ materialised owner
+```
+
+Rule of thumb: when you want an **independent array**, take a concrete type and use `.copy()`
+(or assign an expression into a concrete type). Reserve `auto` for genuine views whose owner
+you know outlives them (e.g. a local `auto col = mat.slice(2);` used within the same scope).
+
+**Catching lifetime bugs.** A dangling-view read is a heap-use-after-free, so build your tests
+with **AddressSanitizer** (`-fsanitize=address`) to detect it precisely — ASan reports the
+read site, the free site (the owner's `destroy()`), and the original allocation, with no
+special library flag. Destroying the *owner* itself and then indexing it is additionally
+caught by `JIARRAY_DEBUG` bounds checks (its sizes reset to zero).
+
 ### Element Access
 
 ```cpp
