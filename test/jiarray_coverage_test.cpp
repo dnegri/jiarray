@@ -440,7 +440,7 @@ TEST(JIArrayCoverageTest, EqualitySameContent) {
 
 TEST(JIArrayCoverageTest, UnaryNegation) {
     zdouble1 arr{1.0, -2.0, 3.0};
-    auto neg = -arr;
+    zdouble1 neg = -arr;
     EXPECT_DOUBLE_EQ(neg(1), -1.0);
     EXPECT_DOUBLE_EQ(neg(2), 2.0);
     EXPECT_DOUBLE_EQ(neg(3), -3.0);
@@ -453,7 +453,7 @@ TEST(JIArrayCoverageTest, UnaryNegation) {
 TEST(JIArrayCoverageTest, SubtractionOperator) {
     zint1 a{10, 20, 30};
     zint1 b{3, 5, 7};
-    auto result = a - b;
+    zint1 result = a - b;
     EXPECT_EQ(result(1), 7);
     EXPECT_EQ(result(2), 15);
     EXPECT_EQ(result(3), 23);
@@ -500,7 +500,7 @@ TEST(JIArrayCoverageTest, ArrayDivisionEquals) {
 TEST(JIArrayCoverageTest, ArrayDivisionOperator) {
     zdouble1 a{10.0, 20.0, 30.0};
     zdouble1 b{2.0, 5.0, 6.0};
-    auto result = a / b;
+    zdouble1 result = a / b;
     EXPECT_DOUBLE_EQ(result(1), 5.0);
     EXPECT_DOUBLE_EQ(result(2), 4.0);
     EXPECT_DOUBLE_EQ(result(3), 5.0);
@@ -508,7 +508,7 @@ TEST(JIArrayCoverageTest, ArrayDivisionOperator) {
 
 TEST(JIArrayCoverageTest, ScalarDivideByArray) {
     zdouble1 arr{2.0, 4.0, 5.0};
-    auto result = 20.0 / arr;
+    zdouble1 result = 20.0 / arr;
     EXPECT_DOUBLE_EQ(result(1), 10.0);
     EXPECT_DOUBLE_EQ(result(2), 5.0);
     EXPECT_DOUBLE_EQ(result(3), 4.0);
@@ -516,7 +516,7 @@ TEST(JIArrayCoverageTest, ScalarDivideByArray) {
 
 TEST(JIArrayCoverageTest, ArrayDivideByScalar) {
     zdouble1 arr{10.0, 20.0, 30.0};
-    auto result = arr / 5.0;
+    zdouble1 result = arr / 5.0;
     EXPECT_DOUBLE_EQ(result(1), 2.0);
     EXPECT_DOUBLE_EQ(result(2), 4.0);
     EXPECT_DOUBLE_EQ(result(3), 6.0);
@@ -524,7 +524,7 @@ TEST(JIArrayCoverageTest, ArrayDivideByScalar) {
 
 TEST(JIArrayCoverageTest, ArrayDivideByScalarInt) {
     zint1 arr{10, 20, 30};
-    auto result = arr / 5;
+    zint1 result = arr / 5;
     EXPECT_EQ(result(1), 2);
     EXPECT_EQ(result(2), 4);
     EXPECT_EQ(result(3), 6);
@@ -536,7 +536,7 @@ TEST(JIArrayCoverageTest, ArrayDivideByScalarInt) {
 
 TEST(JIArrayCoverageTest, ScalarPlusArray) {
     zint1 arr{1, 2, 3};
-    auto result = 10 + arr;
+    zint1 result = 10 + arr;
     EXPECT_EQ(result(1), 11);
     EXPECT_EQ(result(2), 12);
     EXPECT_EQ(result(3), 13);
@@ -544,7 +544,7 @@ TEST(JIArrayCoverageTest, ScalarPlusArray) {
 
 TEST(JIArrayCoverageTest, ArrayPlusScalar) {
     zint1 arr{1, 2, 3};
-    auto result = arr + 10;
+    zint1 result = arr + 10;
     EXPECT_EQ(result(1), 11);
     EXPECT_EQ(result(2), 12);
     EXPECT_EQ(result(3), 13);
@@ -556,7 +556,7 @@ TEST(JIArrayCoverageTest, ArrayPlusScalar) {
 
 TEST(JIArrayCoverageTest, ScalarTimesArray) {
     zdouble1 arr{1.0, 2.0, 3.0};
-    auto result = 3.0 * arr;
+    zdouble1 result = 3.0 * arr;
     EXPECT_DOUBLE_EQ(result(1), 3.0);
     EXPECT_DOUBLE_EQ(result(2), 6.0);
     EXPECT_DOUBLE_EQ(result(3), 9.0);
@@ -564,7 +564,7 @@ TEST(JIArrayCoverageTest, ScalarTimesArray) {
 
 TEST(JIArrayCoverageTest, ArrayTimesScalar) {
     zdouble1 arr{1.0, 2.0, 3.0};
-    auto result = arr * 3.0;
+    zdouble1 result = arr * 3.0;
     EXPECT_DOUBLE_EQ(result(1), 3.0);
     EXPECT_DOUBLE_EQ(result(3), 9.0);
 }
@@ -585,7 +585,7 @@ TEST(JIArrayCoverageTest, ArrayMultiplyEquals) {
 TEST(JIArrayCoverageTest, ArrayMultiplyOperator) {
     zint1 a{2, 3, 4};
     zint1 b{5, 6, 7};
-    auto result = a * b;
+    zint1 result = a * b;
     EXPECT_EQ(result(1), 10);
     EXPECT_EQ(result(2), 18);
     EXPECT_EQ(result(3), 28);

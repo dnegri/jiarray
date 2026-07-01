@@ -386,7 +386,22 @@ arr2 = fa;         // auto-allocates
 
 ### Arithmetic
 
-All arithmetic operations support optional SIMD vectorization via `JIARRAY_USE_SIMD`.
+Element-wise `+ - * /` (array/array and array/scalar) and unary `-` are **expression
+templates**: an operator returns a lazy expression node, and a whole chain such as
+`d = a + b + c` is evaluated in a **single, allocation-free pass** when it is assigned to (or
+used to construct) a `JIArray`. This eliminates the per-operator temporaries that the earlier
+eager operators created — on the streaming benchmark the operator chain went from ~7.9× slower
+than a hand-fused loop to running **at the memory-bandwidth ceiling** (see `docs/EVALUATION.md`).
+
+> ⚠️ **Do not capture an operator result with `auto`.** Because operators return an expression
+> node (not a `JIArray`), write the concrete array type so the result materialises:
+> ```cpp
+> zdouble1 c = a + b;   // ✅ materialises into a JIArray
+> auto     c = a + b;   // ✗ c is a lazy node holding references to a and b;
+>                       //    it cannot be indexed/reassigned and dangles if a or b die
+> ```
+> This is the same rule Eigen/xtensor use. SIMD vectorization of the fused pass is still
+> controlled by `JIARRAY_USE_SIMD`.
 
 **Array-array operations** (element-wise, same size required):
 
@@ -394,10 +409,11 @@ All arithmetic operations support optional SIMD vectorization via `JIARRAY_USE_S
 zdouble1 a{1.0, 2.0, 3.0};
 zdouble1 b{4.0, 5.0, 6.0};
 
-auto c = a + b;     // {5.0, 7.0, 9.0}
-auto d = a - b;     // {-3.0, -3.0, -3.0}
-auto e = a * b;     // {4.0, 10.0, 18.0}
-auto f = a / b;     // {0.25, 0.4, 0.5}
+zdouble1 c = a + b;     // {5.0, 7.0, 9.0}
+zdouble1 d = a - b;     // {-3.0, -3.0, -3.0}
+zdouble1 e = a * b;     // {4.0, 10.0, 18.0}
+zdouble1 f = a / b;     // {0.25, 0.4, 0.5}
+zdouble1 g = a + b + c; // fused: one pass, no temporaries
 
 a += b;             // a = {5.0, 7.0, 9.0}
 a -= b;             // a = {1.0, 2.0, 3.0}
@@ -410,12 +426,12 @@ a /= b;             // a = {1.0, 2.0, 3.0}
 ```cpp
 zdouble1 arr{1.0, 2.0, 3.0};
 
-auto r1 = arr + 10.0;    // {11.0, 12.0, 13.0}
-auto r2 = 10.0 + arr;    // {11.0, 12.0, 13.0}
-auto r3 = arr * 3.0;     // {3.0, 6.0, 9.0}
-auto r4 = 3.0 * arr;     // {3.0, 6.0, 9.0}
-auto r5 = arr / 2.0;     // {0.5, 1.0, 1.5}
-auto r6 = 6.0 / arr;     // {6.0, 3.0, 2.0}
+zdouble1 r1 = arr + 10.0;    // {11.0, 12.0, 13.0}
+zdouble1 r2 = 10.0 + arr;    // {11.0, 12.0, 13.0}
+zdouble1 r3 = arr * 3.0;     // {3.0, 6.0, 9.0}
+zdouble1 r4 = 3.0 * arr;     // {3.0, 6.0, 9.0}
+zdouble1 r5 = arr / 2.0;     // {0.5, 1.0, 1.5}
+zdouble1 r6 = 6.0 / arr;     // {6.0, 3.0, 2.0}
 
 arr += 10.0;              // {11.0, 12.0, 13.0}
 arr *= 2.0;               // {22.0, 24.0, 26.0}
@@ -426,10 +442,13 @@ arr /= 2.0;               // {11.0, 12.0, 13.0}
 
 ```cpp
 zdouble1 arr{1.0, -2.0, 3.0};
-auto neg = -arr;          // {-1.0, 2.0, -3.0}
+zdouble1 neg = -arr;          // {-1.0, 2.0, -3.0}
 ```
 
-**Note**: For floating-point `/=` by scalar, the library uses reciprocal multiplication (`*= 1/val`) for performance.
+**Notes**:
+- In-place `+= -= *= /=` remain eager single-pass operations (no expression templates).
+- For floating-point `/=` by scalar, the library uses reciprocal multiplication (`*= 1/val`)
+  for performance. (The expression-template `array / scalar` divides per element.)
 
 ### Statistics
 

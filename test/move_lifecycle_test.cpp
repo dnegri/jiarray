@@ -650,7 +650,7 @@ TEST(Macros, ArithmeticLoopsStillCompile) {
     EXPECT_DOUBLE_EQ(a(1), 5.0);
     a *= 2.0;
     EXPECT_DOUBLE_EQ(a(1), 10.0);
-    auto c = a + b;                      // returns by value — exercises
+    zdouble1 c = a + b;                      // returns by value — exercises
     EXPECT_DOUBLE_EQ(c(1), 13.0);        // move on return
     auto d = a.sum();
     EXPECT_DOUBLE_EQ(d, 10.0 * 8.0);

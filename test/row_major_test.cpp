@@ -131,7 +131,7 @@ TEST(JIArrayRowMajorTests, ArrayMultiplicationRowMajor) {
     array1 = {2.0, 3.0, 4.0, 5.0}; // Row-major
     array2 = {1.0, 2.0, 3.0, 4.0}; // Row-major
 
-    auto result = array1 * array2;
+    JIArray<double, 2> result = array1 * array2;
     EXPECT_EQ(result(1, 1), 2.0);  // 2*1
     EXPECT_EQ(result(1, 2), 6.0);  // 3*2
     EXPECT_EQ(result(2, 1), 12.0); // 4*3

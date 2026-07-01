@@ -23,6 +23,7 @@
  */
 
 #include "FastArray.h"
+#include "JIArrayExpr.h"
 #include "pch.h"
 #include <algorithm>
 #include <cassert>
@@ -377,6 +378,22 @@ public:
         std::fill(other.rankSize, other.rankSize + RANK, 0);
         std::fill(other.offset,   other.offset   + RANK, 0);
         std::fill(other.sizes,    other.sizes    + RANK, 0);
+    }
+
+    /**
+     * @brief Construct (materialise) from an element-wise expression.
+     * @tparam E Expression node type (see JIArrayExpr.h)
+     * @note Allocates a result matching the expression's shape and evaluates
+     *       the whole expression in a single fused pass — no per-operator
+     *       temporaries.  Enables `zdouble1 d = a + b + c;`.
+     */
+    template <class E, std::enable_if_t<is_jiexpr_v<E>, int> = 0>
+    JIArray(const E& expr) {
+        initByRankSize(expr.size(), expr.rankSize(), expr.offset());
+        JIARRAY_SIMD_LOOP
+        for (int i = 0; i < nn; ++i) {
+            mm[i] = expr.eval(i);
+        }
     }
 
     /**
@@ -1126,6 +1143,29 @@ JIARRAY_UNROLL
         return *this;
     }
 
+    /**
+     * @brief Assign from an element-wise expression (fused, single pass).
+     * @tparam E Expression node type (see JIArrayExpr.h)
+     * @note Evaluates the whole expression once into this array's storage with
+     *       no per-operator temporaries.  If this array is empty it is
+     *       allocated to the expression's shape; otherwise the sizes must
+     *       match.  Element-wise semantics make in-place aliasing (e.g.
+     *       `a = a + b`) safe.
+     */
+    template <class E, std::enable_if_t<is_jiexpr_v<E>, int> = 0>
+    inline this_type& operator=(const E& expr) {
+        if (mm == nullptr) {
+            initByRankSize(expr.size(), expr.rankSize(), expr.offset());
+        } else {
+            JIARRAY_CHECK_SIZE(nn, expr.size());
+        }
+        JIARRAY_SIMD_LOOP
+        for (int i = 0; i < nn; ++i) {
+            mm[i] = expr.eval(i);
+        }
+        return *this;
+    }
+
     // ========================================================================
     // Statistical operations - with conditional SIMD
     // ========================================================================
@@ -1238,23 +1278,6 @@ JIARRAY_UNROLL
     }
 
     /**
-     * @brief Element-wise addition of two arrays
-     * @param array Array to add
-     * @return New array containing sum
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    JIARRAY_HD inline this_type operator+(const this_type& array) const {
-        JIARRAY_CHECK_SIZE(nn, array.nn);
-        this_type result;
-        result.initByRankSize(getSize(), getRankSize(), getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < nn; ++i) {
-            result.mm[i] = mm[i] + array.mm[i];
-        }
-        return result;
-    }
-
-    /**
      * @brief Subtract another array element-wise in-place
      * @param array Array to subtract
      * @return Reference to this array
@@ -1267,39 +1290,6 @@ JIARRAY_UNROLL
             mm[i] -= array.mm[i];
         }
         return *this;
-    }
-
-    /**
-     * @brief Element-wise subtraction of two arrays
-     * @param array Array to subtract
-     * @return New array containing difference
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    JIARRAY_HD inline this_type operator-(const this_type& array) const {
-        JIARRAY_CHECK_SIZE(nn, array.nn);
-        this_type result;
-        result.initByRankSize(getSize(), getRankSize(), getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < nn; ++i) {
-            result.mm[i] = mm[i] - array.mm[i];
-        }
-        return result;
-    }
-
-    /**
-     * @brief Unary negation operator
-     * @param array Array to negate
-     * @return New array with negated elements
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    JIARRAY_HD friend inline this_type operator-(const this_type& array) {
-        this_type result;
-        result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < array.nn; ++i) {
-            result.mm[i] = -array.mm[i];
-        }
-        return result;
     }
 
     /**
@@ -1329,23 +1319,6 @@ JIARRAY_UNROLL
             mm[i] *= array.mm[i];
         }
         return *this;
-    }
-
-    /**
-     * @brief Element-wise multiplication of two arrays
-     * @param array Array to multiply with
-     * @return New array containing product
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    JIARRAY_HD inline this_type operator*(const this_type& array) const {
-        JIARRAY_CHECK_SIZE(nn, array.nn);
-        this_type result;
-        result.initByRankSize(getSize(), getRankSize(), getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < nn; ++i) {
-            result.mm[i] = mm[i] * array.mm[i];
-        }
-        return result;
     }
 
     /**
@@ -1386,130 +1359,13 @@ JIARRAY_UNROLL
         return *this;
     }
 
-    /**
-     * @brief Element-wise division of two arrays
-     * @param lhs Numerator array
-     * @param rhs Denominator array
-     * @return New array containing quotient
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    JIARRAY_HD friend inline this_type operator/(const this_type& lhs, const this_type& rhs) {
-        JIARRAY_CHECK_SIZE(lhs.nn, rhs.nn);
-        this_type result;
-        result.initByRankSize(lhs.getSize(), lhs.getRankSize(), lhs.getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < lhs.nn; ++i) {
-            result.mm[i] = lhs.mm[i] / rhs.mm[i];
-        }
-        return result;
-    }
-
     // ========================================================================
-    // Scalar arithmetic operations - with conditional SIMD
+    // Element-wise `+ - * /` (array/array, array/scalar) and unary `-` are
+    // provided as **lazy expression templates** in JIArrayExpr.h: a whole
+    // expression like `d = a + b + c` evaluates in one fused pass on
+    // assignment/construction, with no per-operator temporaries.  The in-place
+    // `+= -= *= /=` operators above remain eager single-pass fast paths.
     // ========================================================================
-
-    /**
-     * @brief Add scalar to array (commutative)
-     * @tparam Scalar Arithmetic type
-     * @param val Scalar value
-     * @param array Array operand
-     * @return New array with scalar added to each element
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    template <typename Scalar>
-    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
-    operator+(const Scalar& val, const this_type& array) {
-        this_type result;
-        result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < result.nn; ++i) {
-            result.mm[i] = val + array.mm[i];
-        }
-        return result;
-    }
-
-    /// @overload
-    template <typename Scalar>
-    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
-    operator+(const this_type& array, const Scalar& val) {
-        return val + array;
-    }
-
-    /**
-     * @brief Multiply array by scalar (commutative)
-     * @tparam Scalar Arithmetic type
-     * @param val Scalar multiplier
-     * @param array Array operand
-     * @return New array with each element multiplied by scalar
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    template <typename Scalar>
-    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
-    operator*(const Scalar& val, const this_type& array) {
-        this_type result;
-        result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < result.nn; ++i) {
-            result.mm[i] = val * array.mm[i];
-        }
-        return result;
-    }
-
-    /// @overload
-    template <typename Scalar>
-    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
-    operator*(const this_type& array, const Scalar& val) {
-        return val * array;
-    }
-
-    /**
-     * @brief Divide scalar by array element-wise
-     * @tparam Scalar Arithmetic type
-     * @param val Scalar numerator
-     * @param array Array of denominators
-     * @return New array where each element is val / array[i]
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    template <typename Scalar>
-    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
-    operator/(const Scalar& val, const this_type& array) {
-        this_type result;
-        result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-        JIARRAY_SIMD_LOOP
-        for (int i = 0; i < result.nn; ++i) {
-            result.mm[i] = val / array.mm[i];
-        }
-        return result;
-    }
-
-    /**
-     * @brief Divide array by scalar element-wise
-     * @tparam Scalar Arithmetic type
-     * @param array Array numerator
-     * @param val Scalar denominator
-     * @return New array with each element divided by scalar
-     * @note SIMD can be controlled via JIARRAY_USE_SIMD macro
-     */
-    template <typename Scalar>
-    JIARRAY_HD friend inline std::enable_if_t<is_scalar_v<Scalar>, this_type>
-    operator/(const this_type& array, const Scalar& val) {
-        this_type result;
-        result.initByRankSize(array.getSize(), array.getRankSize(), array.getOffset());
-
-        if constexpr (std::is_floating_point_v<Scalar>) {
-            const Scalar rval = Scalar{1} / val;
-            JIARRAY_SIMD_LOOP
-            for (int i = 0; i < result.nn; ++i) {
-                result.mm[i] = array.mm[i] * rval;
-            }
-        } else {
-            JIARRAY_SIMD_LOOP
-            for (int i = 0; i < result.nn; ++i) {
-                result.mm[i] = array.mm[i] / val;
-            }
-        }
-        return result;
-    }
 
     // ========================================================================
     // Additional mathematical operations - with conditional SIMD

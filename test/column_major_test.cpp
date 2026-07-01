@@ -47,7 +47,7 @@ TEST(JIArrayColumnMajorTests, ArithmeticOperations) {
     zdouble2 array2(2, 2);
     array2 = {5.0, 6.0, 7.0, 8.0};
 
-    auto result = array1 + array2;
+    zdouble2 result = array1 + array2;
     EXPECT_EQ(result(1, 1), 6.0);
     EXPECT_EQ(result(2, 1), 8.0);
     EXPECT_EQ(result(1, 2), 10.0);
@@ -288,7 +288,7 @@ TEST(JIArrayColumnMajorTests, ArraySubtraction) {
     array1 = {10.0, 8.0, 6.0, 4.0};
     array2 = {1.0, 2.0, 3.0, 2.0};
 
-    auto result = array1 - array2;
+    zdouble2 result = array1 - array2;
     EXPECT_EQ(result(1, 1), 9.0);
     EXPECT_EQ(result(2, 1), 6.0);
     EXPECT_EQ(result(1, 2), 3.0);
@@ -302,7 +302,7 @@ TEST(JIArrayColumnMajorTests, ArrayMultiplication) {
     array1 = {2.0, 3.0, 4.0, 5.0};
     array2 = {1.0, 2.0, 3.0, 4.0};
 
-    auto result = array1 * array2;
+    zdouble2 result = array1 * array2;
     EXPECT_EQ(result(1, 1), 2.0);
     EXPECT_EQ(result(2, 1), 6.0);
     EXPECT_EQ(result(1, 2), 12.0);
@@ -313,13 +313,13 @@ TEST(JIArrayColumnMajorTests, ScalarMultiplication) {
     JIArray<double, 2> array(2, 2);
     array = {1.0, 2.0, 3.0, 4.0};
 
-    auto result = array * 2.5;
+    JIArray<double, 2> result = array * 2.5;
     EXPECT_EQ(result(1, 1), 2.5);
     EXPECT_EQ(result(2, 1), 5.0);
     EXPECT_EQ(result(1, 2), 7.5);
     EXPECT_EQ(result(2, 2), 10.0);
 
-    auto result2 = 3.0 * array;
+    JIArray<double, 2> result2 = 3.0 * array;
     EXPECT_EQ(result2(1, 1), 3.0);
     EXPECT_EQ(result2(2, 1), 6.0);
     EXPECT_EQ(result2(1, 2), 9.0);
@@ -333,7 +333,7 @@ TEST(JIArrayColumnMajorTests, ArrayDivision) {
     array1 = {10.0, 8.0, 6.0, 4.0};
     array2 = {2.0, 2.0, 3.0, 2.0};
 
-    auto result = array1 / array2;
+    zdouble2 result = array1 / array2;
     EXPECT_DOUBLE_EQ(result(1, 1), 5.0);
     EXPECT_DOUBLE_EQ(result(2, 1), 4.0);
     EXPECT_DOUBLE_EQ(result(1, 2), 2.0);
@@ -344,7 +344,7 @@ TEST(JIArrayColumnMajorTests, ScalarDivision) {
     JIArray<double, 2> array(2, 2);
     array = {10.0, 20.0, 30.0, 40.0};
 
-    auto result = array / 5.0;
+    JIArray<double, 2> result = array / 5.0;
     EXPECT_DOUBLE_EQ(result(1, 1), 2.0);
     EXPECT_DOUBLE_EQ(result(2, 1), 4.0);
     EXPECT_DOUBLE_EQ(result(1, 2), 6.0);
@@ -679,7 +679,7 @@ TEST(JIArrayColumnMajorTests, UnaryMinus) {
     JIArray<double, 2> array(2, 2);
     array = {1.0, -2.0, 3.0, -4.0};
 
-    auto result = -array;
+    JIArray<double, 2> result = -array;
     EXPECT_EQ(result(1, 1), -1.0);
     EXPECT_EQ(result(2, 1), 2.0);
     EXPECT_EQ(result(1, 2), -3.0);
