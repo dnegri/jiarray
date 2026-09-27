@@ -620,3 +620,89 @@ TEST(StorageOrderTest, ThreeDStrides) {
         EXPECT_EQ(a[6], 4);   // (1,1,2) → stride 6
     }
 }
+
+// ============================================================================
+// Per-array index base (Offset): farray0 / f*0 aliases, custom offsets, and
+// the legacy OFFSET argument (ignored in 0.8.0-0.8.1, honoured again).
+// ============================================================================
+
+TEST(OffsetTest, ZeroBasedAliasIndexesFromZero) {
+    fdouble0<4> coef;
+    for (int i = 0; i < 4; ++i) coef(i) = 10.0 * i;
+    EXPECT_DOUBLE_EQ(coef(0), 0.0);
+    EXPECT_DOUBLE_EQ(coef(3), 30.0);
+    EXPECT_DOUBLE_EQ(coef[3], 30.0);  // flat access is always 0-based
+    EXPECT_EQ(coef.OFFSET, 0);
+    EXPECT_EQ(fdouble<4>::OFFSET, static_cast<int>(JIARRAY_OFFSET));
+}
+
+TEST(OffsetTest, ZeroBasedBoundsChecked) {
+    fint0<3> a;
+    EXPECT_NO_THROW(a(0));
+    EXPECT_NO_THROW(a(2));
+    EXPECT_THROW(a(3), std::out_of_range);
+    EXPECT_THROW(a(-1), std::out_of_range);
+}
+
+TEST(OffsetTest, CustomOffsetAnyInteger) {
+    FastArrayBase<int, 5, 3> a({7, 8, 9});
+    EXPECT_EQ(a(5), 7);
+    EXPECT_EQ(a(7), 9);
+    EXPECT_EQ(a.findFirst(8), 6);
+    EXPECT_EQ(a.findFirst(42), 4);  // "not found" sentinel = Offset - 1
+    EXPECT_THROW(a(4), std::out_of_range);
+
+    FastArrayBase<int, -1, 3> b({1, 2, 3});
+    EXPECT_EQ(b(-1), 1);
+    EXPECT_EQ(b(1), 3);
+}
+
+TEST(OffsetTest, ZeroBasedTwoDimensionalLayout) {
+    fint0<2, 3> m(0);
+    m(1, 0) = 2;
+    m(0, 1) = 3;
+    if (m.is_row_major) {
+        EXPECT_EQ(m[3], 2);
+        EXPECT_EQ(m[1], 3);
+    } else {
+        EXPECT_EQ(m[1], 2);
+        EXPECT_EQ(m[2], 3);
+    }
+    EXPECT_THROW(m(2, 0), std::out_of_range);
+}
+
+TEST(OffsetTest, LegacyOffsetArgumentHonoured) {
+    fdouble1d<8, 0> hcoeff;
+    hcoeff(0) = 1.5;
+    hcoeff(7) = 2.5;
+    EXPECT_DOUBLE_EQ(hcoeff[0], 1.5);
+    EXPECT_DOUBLE_EQ(hcoeff[7], 2.5);
+    EXPECT_THROW(hcoeff(8), std::out_of_range);
+
+    FastArray2D<int, 2, 2, 0> m2(0);
+    m2(1, 1) = 4;
+    EXPECT_EQ(m2[3], 4);
+
+    StringFastArray<2, 0> names({"a", "b"});
+    EXPECT_EQ(names(0), "a");
+
+    // Default argument still follows JIARRAY_OFFSET.
+    static_assert(std::is_same_v<fdouble1d<3>, fdouble<3>>);
+    static_assert(std::is_same_v<FastArray2D<int, 2, 2>, fint<2, 2>>);
+}
+
+TEST(OffsetTest, JIArrayAssignFromZeroBased) {
+    fdouble0<3> src({1.0, 2.0, 3.0});
+    zdouble1 dst;
+    dst = src;
+    EXPECT_EQ(dst.size(), 3);
+    EXPECT_DOUBLE_EQ(dst(1), 1.0);
+    EXPECT_DOUBLE_EQ(dst(3), 3.0);
+}
+
+TEST(OffsetTest, DistinctOffsetsAreDistinctTypes) {
+    static_assert(!std::is_same_v<fdouble0<3>, fdouble<3>> || JIARRAY_OFFSET == 0);
+    static_assert(std::is_same_v<farray0<double, 3>, fdouble0<3>>);
+    static_assert(std::is_same_v<FastArray<double, 3>, FastArrayBase<double, JIARRAY_OFFSET, 3>>);
+    SUCCEED();
+}

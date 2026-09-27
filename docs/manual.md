@@ -724,12 +724,33 @@ For row-major, the opposite: iterate with the last index innermost.
 
 ## FastArray
 
-Compile-time fixed-size array, stack-allocated, with offset-based indexing.
+Compile-time fixed-size N-dimensional array, stack-allocated, with offset-based indexing.
 
 ```cpp
-template <class T, std::size_t SIZE, std::size_t OFFSET = JIARRAY_OFFSET>
-class FastArray;
+template <typename T, int Offset, std::size_t... Dims>
+class FastArrayBase;                       // the implementation
+
+template <typename T, std::size_t... Dims>
+using FastArray = FastArrayBase<T, JIARRAY_OFFSET, Dims...>;   // the usual form
 ```
+
+### Index base
+
+Every dimension is indexed from `Offset`. `FastArray` and the `f<type>` aliases
+follow the global `JIARRAY_OFFSET`; `farray0` and the `f<type>0` aliases are
+0-based regardless of it; any other base is `FastArrayBase<T, Offset, Dims...>`.
+`operator[]` is always 0-based flat access, and `findFirst` returns
+`Offset - 1` when not found.
+
+```cpp
+fdouble0<8> coef;               // coef(0) .. coef(7): series coefficient by power
+FastArrayBase<int, 5, 3> a;     // a(5) .. a(7)
+fdouble1d<8, 0> h;              // legacy spelling, also 0-based
+```
+
+The trailing `OFFSET` argument of the legacy aliases (`fdouble1d<N, OFFSET>`,
+`FastArray2D<T, I, J, OFFSET>`, `StringFastArray<N, OFFSET>`, ...) was silently
+ignored in 0.8.0-0.8.1 and is honoured again from 0.8.2.
 
 ### Construction
 
@@ -802,8 +823,8 @@ arr.max_size();  // 5
 2D fixed-size array with column-major layout:
 
 ```cpp
-template <class T, std::size_t SIZE1, std::size_t SIZE2, std::size_t OFFSET = JIARRAY_OFFSET>
-class FastArray2D;
+template <typename T, std::size_t I, std::size_t J, std::size_t OFFSET = JIARRAY_OFFSET>
+using FastArray2D = FastArrayBase<T, OFFSET, I, J>;   // compatibility alias
 ```
 
 ```cpp
@@ -832,18 +853,15 @@ names = std::string("default");   // fill all with "default"
 
 ### FastArray Type Aliases
 
-| Alias | Type |
-|---|---|
-| `fint1d<N>` | `FastArray<int, N>` |
-| `fdouble1d<N>` | `FastArray<double, N>` |
-| `ffloat1d<N>` | `FastArray<float, N>` |
-| `fbool1d<N>` | `FastArray<bool, N>` |
-| `fstring1d<N>` | `StringFastArray<N>` |
-| `fint2d<I, J>` | `FastArray2D<int, I, J>` |
-| `fdouble2d<I, J>` | `FastArray2D<double, I, J>` |
-| `ffloat2d<I, J>` | `FastArray2D<float, I, J>` |
-| `fbool2d<I, J>` | `FastArray2D<bool, I, J>` |
-| `farray<T, N>` | `FastArray<T, N>` |
+| Alias | Type | Index base |
+|---|---|---|
+| `fint<Dims...>`, `fdouble<...>`, `ffloat<...>`, `fbool<...>`, `fchar<...>`, `fshort<...>`, `flong<...>`, `fstring<...>` | `FastArray<type, Dims...>` | `JIARRAY_OFFSET` |
+| `farray<T, Dims...>` | `FastArray<T, Dims...>` | `JIARRAY_OFFSET` |
+| `fint0<Dims...>`, `fdouble0<...>`, `ffloat0<...>`, `fbool0<...>`, `fchar0<...>`, `fshort0<...>`, `flong0<...>`, `fstring0<...>` | `FastArrayBase<type, 0, Dims...>` | 0 |
+| `farray0<T, Dims...>` | `FastArrayBase<T, 0, Dims...>` | 0 |
+| `fint1d<N, O>`, `fdouble1d<N, O>`, `ffloat1d<N, O>`, `fbool1d<N, O>`, `fstring1d<N, O>` (deprecated) | `FastArrayBase<type, O, N>` | `O` (default `JIARRAY_OFFSET`) |
+| `fint2d<I, J, O>`, `fdouble2d<I, J, O>`, `ffloat2d<I, J, O>`, `fbool2d<I, J, O>` (deprecated) | `FastArrayBase<type, O, I, J>` | `O` (default `JIARRAY_OFFSET`) |
+| `FastArray2D<T, I, J, O>`, `StringFastArray<N, O>` (compatibility) | `FastArrayBase<T, O, ...>` | `O` (default `JIARRAY_OFFSET`) |
 
 ---
 
