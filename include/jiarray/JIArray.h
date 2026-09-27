@@ -1031,8 +1031,8 @@ JIARRAY_UNROLL
         return *this;
     }
 
-    template <typename T2, size_t NN>
-    JIARRAY_HD inline this_type& operator=(const FastArray<T2, NN>& val) {
+    template <typename T2, int Offset2, size_t NN>
+    JIARRAY_HD inline this_type& operator=(const FastArrayBase<T2, Offset2, NN>& val) {
         if (nn == 0) {
             int dimensions[RANK];
             std::fill(dimensions, dimensions + RANK, 1);

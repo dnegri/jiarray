@@ -20,23 +20,28 @@ namespace dnegri::jiarray {
  *   - `JIARRAY_COLUMN_MAJOR == 0` → row-major (last dim stride 1)
  *   - `JIARRAY_COLUMN_MAJOR != 0` → column-major (first dim stride 1)
  *
- * Index base follows `JIARRAY_OFFSET` (0 or 1). `operator()` takes
- * exactly `RANK` offset-relative indices; `operator[]` provides
- * 0-based flat access.
+ * Index base is the `Offset` template argument, the same for every
+ * dimension: `FastArray<T, Dims...>` (and `fint`, `fdouble`, ...) use the
+ * global `JIARRAY_OFFSET`; `farray0<T, Dims...>` (and `fint0`, `fdouble0`,
+ * ...) are 0-based regardless of it (restores the pre-0.8.0 per-array
+ * OFFSET).  `operator()` takes exactly `RANK` offset-relative indices;
+ * `operator[]` provides 0-based flat access.
  *
- * @tparam T     Element type.
- * @tparam Dims  Per-dimension extents (compile-time). Rank must be ≥ 1.
+ * @tparam T       Element type.
+ * @tparam Offset  Index base of every dimension (any integer).
+ * @tparam Dims    Per-dimension extents (compile-time). Rank must be ≥ 1.
  *
  * Example:
  * @code
- *   fint<6>       v;          // 1D
+ *   fint<6>       v;          // 1D, JIARRAY_OFFSET-based
  *   fint<3, 4>   m;          // 2D
  *   fint<3, 4, 5> c;          // 3D
  *   fstring<10>  names;       // FastArray<std::string, 10>
+ *   fdouble0<8>  coef;        // 0-based: coef(0) .. coef(7)
  * @endcode
  */
-template <typename T, std::size_t... Dims>
-class FastArray {
+template <typename T, int Offset, std::size_t... Dims>
+class FastArrayBase {
     static_assert(sizeof...(Dims) > 0,
                   "FastArray requires at least one dimension");
 
@@ -45,6 +50,7 @@ public:
     static constexpr std::size_t RANK = sizeof...(Dims);
     static constexpr std::size_t SIZE = (std::size_t{1} * ... * Dims);
     static constexpr bool is_row_major = (JIARRAY_COLUMN_MAJOR == 0);
+    static constexpr int OFFSET = Offset;  ///< Index base of every dimension.
 
     T mm[SIZE]{};
 
@@ -75,15 +81,15 @@ private:
         }
 
         const std::size_t arr[RANK] = {
-            static_cast<std::size_t>(idx - static_cast<int>(JIARRAY_OFFSET))...
+            static_cast<std::size_t>(static_cast<int>(idx) - Offset)...
         };
 #if defined(JIARRAY_DEBUG) && !defined(__CUDA_ARCH__)
         {
             const int raw[RANK] = { static_cast<int>(idx)... };
             for (std::size_t d = 0; d < RANK; ++d) {
                 JIARRAY_CHECK_BOUND(raw[d],
-                                    static_cast<int>(JIARRAY_OFFSET),
-                                    static_cast<int>(JIARRAY_OFFSET + dims_local[d] - 1));
+                                    Offset,
+                                    Offset + static_cast<int>(dims_local[d]) - 1);
             }
         }
 #endif
@@ -96,9 +102,9 @@ private:
 
 public:
     // ---- constructors ----
-    FastArray() = default;
+    FastArrayBase() = default;
 
-    FastArray(std::initializer_list<T> il) {
+    FastArrayBase(std::initializer_list<T> il) {
         std::size_t i = 0;
         for (auto const& v : il) {
             if (i >= SIZE) break;
@@ -106,20 +112,20 @@ public:
         }
     }
 
-    explicit FastArray(const T& val) {
+    explicit FastArrayBase(const T& val) {
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] = val;
     }
 
     template <std::size_t N>
-    explicit FastArray(const T (&a)[N]) {
+    explicit FastArrayBase(const T (&a)[N]) {
         static_assert(N == SIZE, "C-array size must match FastArray SIZE");
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] = a[i];
     }
 
-    FastArray(const FastArray&)            = default;
-    FastArray(FastArray&&)                 = default;
-    FastArray& operator=(const FastArray&) = default;
-    FastArray& operator=(FastArray&&)      = default;
+    FastArrayBase(const FastArrayBase&)            = default;
+    FastArrayBase(FastArrayBase&&)                 = default;
+    FastArrayBase& operator=(const FastArrayBase&) = default;
+    FastArrayBase& operator=(FastArrayBase&&)      = default;
 
     // ---- element access ----
     template <typename... Idx>
@@ -139,51 +145,51 @@ public:
     JIARRAY_HD inline const T* data() const noexcept { return mm; }
 
     // ---- scalar / pointer assignment ----
-    inline FastArray& operator=(const T& val) {
+    inline FastArrayBase& operator=(const T& val) {
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] = val;
         return *this;
     }
-    inline FastArray& operator=(const T* p) {
+    inline FastArrayBase& operator=(const T* p) {
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] = p[i];
         return *this;
     }
 
     // ---- arithmetic (only valid when T supports the operator) ----
-    inline FastArray& operator+=(const T& val) {
+    inline FastArrayBase& operator+=(const T& val) {
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] += val;
         return *this;
     }
-    inline FastArray& operator*=(const T& val) {
+    inline FastArrayBase& operator*=(const T& val) {
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] *= val;
         return *this;
     }
-    inline FastArray& operator/=(const T& val) {
+    inline FastArrayBase& operator/=(const T& val) {
         for (std::size_t i = 0; i < SIZE; ++i) mm[i] /= val;
         return *this;
     }
-    inline FastArray operator*(const T& val) const {
-        FastArray r = *this;
+    inline FastArrayBase operator*(const T& val) const {
+        FastArrayBase r = *this;
         r *= val;
         return r;
     }
 
     // ---- equality ----
-    inline bool operator==(const FastArray& other) const {
+    inline bool operator==(const FastArrayBase& other) const {
         for (std::size_t i = 0; i < SIZE; ++i) {
             if (!(mm[i] == other.mm[i])) return false;
         }
         return true;
     }
-    inline bool operator!=(const FastArray& other) const {
+    inline bool operator!=(const FastArrayBase& other) const {
         return !(*this == other);
     }
 
     // ---- searches / reductions ----
     inline int findFirst(const T& val) const {
         for (std::size_t i = 0; i < SIZE; ++i) {
-            if (mm[i] == val) return static_cast<int>(i + JIARRAY_OFFSET);
+            if (mm[i] == val) return static_cast<int>(i) + Offset;
         }
-        return static_cast<int>(JIARRAY_OFFSET) - 1;
+        return Offset - 1;
     }
 
     inline T min() const {
@@ -246,8 +252,12 @@ public:
 // Out-of-class definition for static constexpr C-array member.  In C++17 the
 // in-class declaration is itself an inline definition, but supplying this
 // keeps older toolchains (and CUDA host/device linker) happy.
+template <typename T, int Offset, std::size_t... Dims>
+constexpr std::size_t FastArrayBase<T, Offset, Dims...>::dims_arr_[FastArrayBase<T, Offset, Dims...>::RANK];
+
+/// Fixed-size array indexed from the global JIARRAY_OFFSET (the usual form).
 template <typename T, std::size_t... Dims>
-constexpr std::size_t FastArray<T, Dims...>::dims_arr_[FastArray<T, Dims...>::RANK];
+using FastArray = FastArrayBase<T, static_cast<int>(JIARRAY_OFFSET), Dims...>;
 
 // ============================================================================
 // Preferred type aliases (variadic — match dimension list directly)
@@ -264,38 +274,54 @@ template <std::size_t... Dims> using fstring = FastArray<std::string, Dims...>;
 template <typename T, std::size_t... Dims>
 using farray = FastArray<T, Dims...>;
 
+// 0-based variants, independent of JIARRAY_OFFSET (e.g. polynomial / series
+// coefficients indexed by power 0..n).
+template <std::size_t... Dims> using fbool0   = FastArrayBase<bool,        0, Dims...>;
+template <std::size_t... Dims> using fchar0   = FastArrayBase<char,        0, Dims...>;
+template <std::size_t... Dims> using fshort0  = FastArrayBase<short,       0, Dims...>;
+template <std::size_t... Dims> using fint0    = FastArrayBase<int,         0, Dims...>;
+template <std::size_t... Dims> using flong0   = FastArrayBase<long,        0, Dims...>;
+template <std::size_t... Dims> using ffloat0  = FastArrayBase<float,       0, Dims...>;
+template <std::size_t... Dims> using fdouble0 = FastArrayBase<double,      0, Dims...>;
+template <std::size_t... Dims> using fstring0 = FastArrayBase<std::string, 0, Dims...>;
+
+template <typename T, std::size_t... Dims>
+using farray0 = FastArrayBase<T, 0, Dims...>;
+
 // ============================================================================
 // Class-name compatibility (pre-0.8.0): FastArray2D and StringFastArray were
-// separate types.  Now thin aliases over the unified FastArray.
+// separate types.  Now thin aliases over the unified FastArrayBase; the
+// trailing OFFSET argument is honoured again (0.8.0-0.8.1 ignored it).
 // ============================================================================
-template <typename T, std::size_t I, std::size_t J, std::size_t = JIARRAY_OFFSET>
-using FastArray2D = FastArray<T, I, J>;
+template <typename T, std::size_t I, std::size_t J, std::size_t OFFSET = JIARRAY_OFFSET>
+using FastArray2D = FastArrayBase<T, static_cast<int>(OFFSET), I, J>;
 
-template <std::size_t N, std::size_t = JIARRAY_OFFSET>
-using StringFastArray = FastArray<std::string, N>;
+template <std::size_t N, std::size_t OFFSET = JIARRAY_OFFSET>
+using StringFastArray = FastArrayBase<std::string, static_cast<int>(OFFSET), N>;
 
 // ============================================================================
 // Backward-compatibility aliases (rank-suffixed; deprecated, kept for
-// downstream code still using the pre-0.8.0 names).
+// downstream code still using the pre-0.8.0 names).  The optional second /
+// third argument is the index base (e.g. fdouble1d<8, 0> is 0-based).
 // ============================================================================
-template <int I, int = JIARRAY_OFFSET>
-using fbool1d   = FastArray<bool,        static_cast<std::size_t>(I)>;
-template <int I, int = JIARRAY_OFFSET>
-using fint1d    = FastArray<int,         static_cast<std::size_t>(I)>;
-template <int I, int = JIARRAY_OFFSET>
-using ffloat1d  = FastArray<float,       static_cast<std::size_t>(I)>;
-template <int I, int = JIARRAY_OFFSET>
-using fdouble1d = FastArray<double,      static_cast<std::size_t>(I)>;
-template <int I, int = JIARRAY_OFFSET>
-using fstring1d = FastArray<std::string, static_cast<std::size_t>(I)>;
+template <int I, int OFFSET = JIARRAY_OFFSET>
+using fbool1d   = FastArrayBase<bool,        OFFSET, static_cast<std::size_t>(I)>;
+template <int I, int OFFSET = JIARRAY_OFFSET>
+using fint1d    = FastArrayBase<int,         OFFSET, static_cast<std::size_t>(I)>;
+template <int I, int OFFSET = JIARRAY_OFFSET>
+using ffloat1d  = FastArrayBase<float,       OFFSET, static_cast<std::size_t>(I)>;
+template <int I, int OFFSET = JIARRAY_OFFSET>
+using fdouble1d = FastArrayBase<double,      OFFSET, static_cast<std::size_t>(I)>;
+template <int I, int OFFSET = JIARRAY_OFFSET>
+using fstring1d = FastArrayBase<std::string, OFFSET, static_cast<std::size_t>(I)>;
 
-template <int I, int J, int = JIARRAY_OFFSET>
-using fbool2d   = FastArray<bool,   static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
-template <int I, int J, int = JIARRAY_OFFSET>
-using fint2d    = FastArray<int,    static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
-template <int I, int J, int = JIARRAY_OFFSET>
-using ffloat2d  = FastArray<float,  static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
-template <int I, int J, int = JIARRAY_OFFSET>
-using fdouble2d = FastArray<double, static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
+template <int I, int J, int OFFSET = JIARRAY_OFFSET>
+using fbool2d   = FastArrayBase<bool,   OFFSET, static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
+template <int I, int J, int OFFSET = JIARRAY_OFFSET>
+using fint2d    = FastArrayBase<int,    OFFSET, static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
+template <int I, int J, int OFFSET = JIARRAY_OFFSET>
+using ffloat2d  = FastArrayBase<float,  OFFSET, static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
+template <int I, int J, int OFFSET = JIARRAY_OFFSET>
+using fdouble2d = FastArrayBase<double, OFFSET, static_cast<std::size_t>(I), static_cast<std::size_t>(J)>;
 
 } // namespace dnegri::jiarray
