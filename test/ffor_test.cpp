@@ -5,6 +5,10 @@
 #include <jiarray/JIArray.h>
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <type_traits>
+#include <utility>
+
 TEST(Ffor, DefaultStep_OneBased) {
     int sum = 0;
     ffor(i, 1, 5) sum += i;
@@ -64,22 +68,36 @@ TEST(Ffor, IterationCountMatchesStep) {
     EXPECT_EQ(count, 15);  // 0,7,14,...,98 → 15 values
 }
 
-TEST(Ffor, BreakConditionInEndExpression) {
-    // Some call sites lean on operator precedence (`<=` binds tighter
-    // than `&&`) to write break-conditions:
-    //
-    //     ffor(i, 1, count && !found) { ... }
-    //
-    // expands to `for (int i = 1; i <= count && !found; ++i)`, i.e.
-    // `(i <= count) && !found`.  If the macro paren-wrapped `end` it
-    // would silently become `i <= (count && !found)` and stop after
-    // one iteration.  This test pins the precedence-sensitive form.
-    bool found = false;
-    int count = 5;
+namespace {
+template <class T, class = void>
+struct AcceptsAsLoopBound : std::false_type {};
+template <class T>
+struct AcceptsAsLoopBound<T, std::void_t<decltype(dnegri::jiarray::detail::loopBound(std::declval<T>()))>>
+    : std::true_type {};
+}  // namespace
+
+TEST(Ffor, EndIsOneCompleteExpression) {
+    // A bare `i <= end` read `ffor(i, 1, flag ? 3 : 5)` as
+    // `(i <= flag) ? 3 : 5` -- an endless loop. The bound is now one
+    // expression whatever its operators.
+    const bool flag = true;
     int visits = 0;
-    ffor(i, 1, count && !found) {
-        ++visits;
-        if (i == 3) found = true;  // exit after the 3rd iteration
-    }
+    ffor(i, 1, flag ? 3 : 5) ++visits;
     EXPECT_EQ(visits, 3);
+
+    visits = 0;
+    zfor(i, 6 & 3) ++visits;  // 6 & 3 == 2, not (i <= 6) & 3
+    EXPECT_EQ(visits, 2);
+
+    visits = 0;
+    ffor_back(i, 4, flag ? 2 : 1) ++visits;
+    EXPECT_EQ(visits, 3);
+}
+
+TEST(Ffor, BoolBoundIsRejected) {
+    // The former break-condition idiom `ffor(i, 1, count && !found)` and a
+    // mistyped comparison both yield bool; they must not compile.
+    static_assert(!AcceptsAsLoopBound<bool>::value, "a bool loop bound must not compile");
+    static_assert(AcceptsAsLoopBound<int>::value, "an int loop bound must compile");
+    static_assert(AcceptsAsLoopBound<std::size_t>::value, "a size_t loop bound must compile");
 }

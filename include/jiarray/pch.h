@@ -86,4 +86,17 @@ namespace dnegri::jiarray {
 #define JIARRAY_ALLOCATED_OFFSET 4
 #define JIARRAY_ALLOCATED_ALL 7
 #define JIARRAY_ALLOCATED_RANKSIZE_OFFSET 6
+
+namespace detail {
+/// Loop-bound pass-through for the ffor/zfor family. As a function argument
+/// `end` is evaluated as one complete expression, so `zfor(k, c ? a : b)` or
+/// `zfor(k, a & b)` mean what they say. A bool bound is rejected: it is either
+/// the old `zfor(i, n && !found)` break-condition idiom or a comparison typed
+/// by mistake -- put a `break` in the loop body instead.
+template <class T>
+JIARRAY_HD constexpr T loopBound(T end) {
+    return end;
+}
+void loopBound(bool) = delete;
+} // namespace detail
 }; // namespace dnegri::jiarray

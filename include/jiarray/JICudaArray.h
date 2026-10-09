@@ -1182,16 +1182,17 @@ public:
 #define cstring4 JICudaArray<string, 4>
 #define cstring5 JICudaArray<string, 5>
 
+// Bounds go through detail::loopBound (pch.h): see the ffor note in JIArray.h.
 #if JIARRAY_OFFSET == 0
-    #define ffor(i, begin, end)      for (int i = begin; i < end; ++i)
-    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+    #define ffor(i, begin, end)      for (int i = begin; i < ::dnegri::jiarray::detail::loopBound(end); ++i)
+    #define ffor_back(i, begin, end) for (int i = begin; i >= ::dnegri::jiarray::detail::loopBound(end); --i)
 #else
-    #define ffor(i, begin, end)      for (int i = begin; i <= end; ++i)
-    #define ffor_back(i, begin, end) for (int i = begin; i >= end; --i)
+    #define ffor(i, begin, end)      for (int i = begin; i <= ::dnegri::jiarray::detail::loopBound(end); ++i)
+    #define ffor_back(i, begin, end) for (int i = begin; i >= ::dnegri::jiarray::detail::loopBound(end); --i)
 #endif
 
 #define zfor(i, end)      ffor(i, JIARRAY_OFFSET, end)
-#define zfor_back(i, end) ffor_back(i, end - 1 + JIARRAY_OFFSET, JIARRAY_OFFSET)
+#define zfor_back(i, end) ffor_back(i, ::dnegri::jiarray::detail::loopBound(end) - 1 + JIARRAY_OFFSET, JIARRAY_OFFSET)
 
 template <typename Type, int N = 1>
 using carray = JICudaArray<Type, N>;

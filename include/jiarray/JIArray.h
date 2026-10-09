@@ -1898,18 +1898,21 @@ using zstring5 = JIArray<std::string, 5>;
 #define GET_STEP_IMPL(_1, _2, ...) _2
 #define GET_STEP(...)              GET_STEP_IMPL(0 __VA_OPT__(, ) __VA_ARGS__, 1)
 
-// Note: `begin` and `end` are NOT paren-wrapped on purpose.  Existing
-// call sites use the implicit `<=` > `&&` precedence to write
-// break-conditions like `zfor(i, count && !found)`, which would silently
-// change meaning if we wrapped `(count && !found)` and bound it tighter
-// than the comparison.  Step is single-token (an integer literal in
-// every call site), so leaving it bare is also safe.
+// `end` goes through detail::loopBound, so it is one complete expression
+// whatever operators it holds (a bare `i <= end` turned `zfor(k, c ? a : b)`
+// into `(k <= c) ? a : b`, an endless loop), and a bool bound -- the former
+// `zfor(i, n && !found)` break-condition idiom -- no longer compiles. `begin`
+// and the step sit in assignment context, where precedence cannot bite.
 #if JIARRAY_OFFSET == 0
-    #define ffor(i, begin, end, ...)      for (int i = begin; i < end;  i += GET_STEP(__VA_ARGS__))
-    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
+    #define ffor(i, begin, end, ...)                                                                                  \
+        for (int i = begin; i < ::dnegri::jiarray::detail::loopBound(end); i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...)                                                                             \
+        for (int i = begin; i >= ::dnegri::jiarray::detail::loopBound(end); i -= GET_STEP(__VA_ARGS__))
 #else
-    #define ffor(i, begin, end, ...)      for (int i = begin; i <= end; i += GET_STEP(__VA_ARGS__))
-    #define ffor_back(i, begin, end, ...) for (int i = begin; i >= end; i -= GET_STEP(__VA_ARGS__))
+    #define ffor(i, begin, end, ...)                                                                                  \
+        for (int i = begin; i <= ::dnegri::jiarray::detail::loopBound(end); i += GET_STEP(__VA_ARGS__))
+    #define ffor_back(i, begin, end, ...)                                                                             \
+        for (int i = begin; i >= ::dnegri::jiarray::detail::loopBound(end); i -= GET_STEP(__VA_ARGS__))
 #endif
 
 /**

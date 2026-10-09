@@ -634,6 +634,20 @@ zfor(i, n) {
 }
 ```
 
+`end` is evaluated as one complete expression (`ffor(i, 1, c ? a : b)` loops
+to `c ? a : b`), and must not be `bool`: the former break-condition idiom
+`zfor(i, n && !found)` is a compile error since 0.8.3 -- test the condition
+and `break` inside the loop instead:
+
+```cpp
+zfor(i, n) {
+    if (found) {
+        break;
+    }
+    // ...
+}
+```
+
 ---
 
 ## Multi-Dimensional Arrays
