@@ -14,8 +14,12 @@ add_library(jiarray ALIAS dnegri.jiarray)
 # `ffor(i, b, e, step)` in JIArray.h uses C++20 __VA_OPT__, which on
 # MSVC requires the conforming preprocessor.  Propagate the flag to
 # every consumer that links jiarray; it is a no-op on GCC / Clang.
+# A CUDA consumer gets it through -Xcompiler: nvcc reads a bare /Zc:... as an
+# input file, while the cl compiling a .cu file's host side needs the flag.
 if (MSVC)
-    target_compile_options(dnegri.jiarray INTERFACE /Zc:preprocessor)
+    target_compile_options(dnegri.jiarray INTERFACE
+        $<$<COMPILE_LANGUAGE:C,CXX>:/Zc:preprocessor>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
 endif()
 
 option(JIARRAY_BUILD_TESTS "Build jiarray tests" ${PROJECT_IS_TOP_LEVEL})

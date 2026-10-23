@@ -71,7 +71,7 @@ public:
         init(args...);
     }
 
-    JICudaArray(T* memory_, decltype(INTS)... args) {
+    JICudaArray(T* memory_, index_size_t<INTS>... args) {
         init(args..., memory_);
     }
 
@@ -175,7 +175,7 @@ public:
         allocated = JIARRAY_ALLOCATED_ALL;
     }
 
-    JIARRAY_HD void init(decltype(INTS)... array_sizes, T* memory_) {
+    JIARRAY_HD void init(index_size_t<INTS>... array_sizes, T* memory_) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
         nn = (array_sizes * ...);
@@ -239,7 +239,7 @@ public:
             sumOfOffset += rankSize[i] * offset[i];
     }
 
-    void setSize(decltype(INTS)... array_sizes) {
+    void setSize(index_size_t<INTS>... array_sizes) {
         size_t sizes[] = {static_cast<size_t>(array_sizes)...};
 
         bool same = true;
@@ -383,7 +383,7 @@ public:
         return offset[rank - JIARRAY_OFFSET];
     }
 
-    JIARRAY_HD inline T& at(decltype(INTS)... index) {
+    JIARRAY_HD inline T& at(index_size_t<INTS>... index) {
         JIARRAY_CHECK_RANK(RANK, sizeof...(index));
 
         size_t idx[] = {index...};
@@ -401,7 +401,7 @@ public:
         return mm[pos];
     }
 
-    JIARRAY_HD inline const T& at(decltype(INTS)... index) const {
+    JIARRAY_HD inline const T& at(index_size_t<INTS>... index) const {
         return const_cast<std::remove_const_t<JICudaArray<T, RANK>>&>(*this).at(index...);
     }
 
@@ -413,11 +413,11 @@ public:
         return at(index);
     }
 
-    JIARRAY_HD inline const T& operator()(decltype(INTS)... index) const {
+    JIARRAY_HD inline const T& operator()(index_size_t<INTS>... index) const {
         return at(index...);
     }
 
-    JIARRAY_HD inline T& operator()(decltype(INTS)... index) {
+    JIARRAY_HD inline T& operator()(index_size_t<INTS>... index) {
         return at(index...);
     }
 

@@ -111,6 +111,24 @@ template <typename... Args>
 inline constexpr bool all_integral_v = all_integral<Args...>::value;
 
 /**
+ * @brief size_t, one per element of an index pack: `index_size_t<INTS>...`
+ *        declares one size_t parameter per dimension.
+ *
+ * Spelled as a dependent member type, not `index_size_t<INTS>...`: nvcc's
+ * front end resolves the non-dependent decltype to size_t when it rewrites
+ * a .cu file's host code for MSVC, which drops the pack (cl error C3543).
+ * @tparam I The pack element (unused)
+ */
+template <size_t I>
+struct index_size {
+    using type = size_t;
+};
+
+/// @brief Helper alias for index_size
+template <size_t I>
+using index_size_t = typename index_size<I>::type;
+
+/**
  * @brief Type trait to check if type is arithmetic (for scalar operations)
  * @tparam T Type to check
  */
@@ -423,7 +441,7 @@ public:
      * @param memory_ Pointer to external memory
      * @param args Dimension sizes
      */
-    JIArray(T* memory_, decltype(INTS)... args) {
+    JIArray(T* memory_, index_size_t<INTS>... args) {
         static_assert(sizeof...(INTS) == RANK, "Number of dimensions must match rank");
         init(args..., memory_);
     }
@@ -516,7 +534,7 @@ JIARRAY_UNROLL
      * @param memory_ Pointer to external memory buffer
      * @note Array will not own the memory and won't deallocate it
      */
-    void init(decltype(INTS)... array_sizes, T* memory_) {
+    void init(index_size_t<INTS>... array_sizes, T* memory_) {
         JIARRAY_CHECK_NOT_ALLOCATED();
 
         const int dimensions[] = {static_cast<int>(array_sizes)...};
