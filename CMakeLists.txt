@@ -86,5 +86,40 @@ if(JIARRAY_BUILD_TESTS)
     target_compile_options(${PROJECT_NAME}.row_major_test
       PRIVATE -DJIARRAY_COLUMN_MAJOR=0)
 
+    # JIDeviceArray suites need nvcc and a GPU, so they are opt-in.
+    option(JIARRAY_WITH_CUDA_TESTS "Build the JIDeviceArray CUDA tests and benchmark" OFF)
+    if(JIARRAY_WITH_CUDA_TESTS)
+      if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        if(CMAKE_VERSION VERSION_LESS 3.24)
+          message(FATAL_ERROR "Set CMAKE_CUDA_ARCHITECTURES (e.g. 89) for JIARRAY_WITH_CUDA_TESTS")
+        endif()
+        set(CMAKE_CUDA_ARCHITECTURES native)
+      endif()
+      enable_language(CUDA)
+      find_package(CUDAToolkit REQUIRED)
+
+      function(_ji_add_cuda_gtest name src)
+        add_executable(${PROJECT_NAME}.${name} ${src})
+        target_compile_definitions(${PROJECT_NAME}.${name} PRIVATE JIARRAY_DEBUG)
+        set_target_properties(${PROJECT_NAME}.${name} PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+        target_link_libraries(${PROJECT_NAME}.${name}
+          PRIVATE jiarray CUDA::cudart GTest::gtest_main GTest::gtest)
+        gtest_discover_tests(${PROJECT_NAME}.${name})
+      endfunction()
+
+      _ji_add_cuda_gtest(device_array_test          ./test/device_array_test.cu)
+      _ji_add_cuda_gtest(device_array_rowmajor_test ./test/device_array_test.cu)
+      target_compile_definitions(${PROJECT_NAME}.device_array_rowmajor_test
+        PRIVATE JIARRAY_COLUMN_MAJOR=0)
+      # Same header through the host compiler only (no nvcc).
+      _ji_add_cuda_gtest(device_array_host_test     ./test/device_array_host_test.cpp)
+
+      # Raw-pointer vs view timing; not a ctest (no JIARRAY_DEBUG, run by hand).
+      add_executable(${PROJECT_NAME}.device_array_bench ./test/device_array_bench.cu)
+      set_target_properties(${PROJECT_NAME}.device_array_bench PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+      target_compile_options(${PROJECT_NAME}.device_array_bench PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-O3 -lineinfo>)
+      target_link_libraries(${PROJECT_NAME}.device_array_bench PRIVATE jiarray CUDA::cudart)
+    endif()
+
   endif()
 endif()
