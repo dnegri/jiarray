@@ -47,7 +47,8 @@ Because these are compile-time, the test suite compiles the *same* source twice 
 - `JIArrayExpr.h` — lazy expression templates backing element-wise `+ - * /` and unary `-` (see "Expression templates" below). Included by `JIArray.h`.
 - `FastArray.h` — `FastArray<T, Dims...>`, a variadic, stack-allocated, compile-time-sized array (1D/2D/ND, also backs string arrays). CUDA-safe (`JIARRAY_HD`).
 - `JIVector.h` — `JIVector<T>`, a thin `std::vector` subclass giving 1-based `operator()`/`at()` and `find`/`contains`.
-- `JICudaArray.h` — `JICudaArray<T, RANK>`, a CUDA device-memory analogue of JIArray (only relevant under `nvcc`/`__CUDACC__`).
+- `JICudaArray.h` — `JICudaArray<T, RANK>`, a CUDA managed-memory analogue of JIArray (only relevant under `nvcc`/`__CUDACC__`).
+- `JIDeviceView.h` / `JIDeviceArray.h` — `JIDeviceView<T, RANK, Index>` (trivially copyable kernel view, JIArray indexing with offsets folded into the base pointer) and `JIDeviceArray<T, RANK, Index>` (move-only `cudaMalloc` owner, upload/download from JIArray; aliases `dint*`/`dfloat*`/`ddouble*`). Empty without `cuda_runtime.h`. CUDA tests are opt-in: `-DJIARRAY_WITH_CUDA_TESTS=ON` (column- and row-major variants, a host-compiler-only variant, and `device_array_bench`).
 - `HighFiveExtension.hpp` — `HighFive::inspector` specializations enabling direct HDF5 read/write of JIArray/JIVector (needs HighFive available).
 
 ## Memory ownership model — the key gotcha

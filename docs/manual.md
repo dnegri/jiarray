@@ -30,6 +30,14 @@
   - [FastArray Type Aliases](#fastarray-type-aliases)
 - [JIVector](#jivector)
   - [JIVector Type Aliases](#jivector-type-aliases)
+- [JIDeviceArray](#jidevicearray)
+  - [Device Type Aliases](#device-type-aliases)
+  - [Allocation](#allocation)
+  - [Host-Device Transfer](#host-device-transfer)
+  - [Kernel Views and Indexing](#kernel-views-and-indexing)
+  - [Indexing Cost](#indexing-cost)
+  - [Debug Checks](#debug-checks)
+  - [CUDA Tests](#cuda-tests)
 - [Integration](#integration)
   - [CMake](#cmake)
   - [HighFive HDF5 Extension](#highfive-hdf5-extension)
@@ -950,6 +958,197 @@ v = arr;                // from JIArray (appends elements via push_back)
 | `zdoubles` | `JIVector<double>` |
 | `zfloats` | `JIVector<float>` |
 | `zstrings` | `JIVector<std::string>` |
+
+---
+
+## JIDeviceArray
+
+`JIDeviceArray<T, RANK, Index>` (`#include <jiarray/JIDeviceArray.h>`) is a CUDA
+device-memory array with JIArray shape, offsets and indexing. It has two halves:
+
+- **`JIDeviceArray`** -- the host-side owner. Allocates device-only memory
+  (`cudaMalloc`, or stream-ordered `cudaMallocAsync`), RAII, **move-only** (copy is
+  deleted), no virtual. It moves data to and from host `JIArray`s. It never
+  dereferences device memory on the host.
+- **`JIDeviceView`** (`JIDeviceArray::View`, from `view()`) -- a non-owning,
+  **trivially copyable** view passed to kernels **by value**. In kernels it is
+  indexed with JIArray syntax: `a(i, j, k)`, `slice`, `reshape`, `zfor`/`ffor`.
+
+Unlike `JICudaArray` (managed memory, used by montex), there is no host element
+access and no page migration. Element arithmetic, statistics, search and
+expression assignment are not provided -- write kernels.
+
+The header works under nvcc and also under a host-only compiler that sees
+`cuda_runtime.h` (link `CUDA::cudart`). `fillAsync` launches a kernel, so it
+needs nvcc. If the CUDA runtime header is not found, the header is empty.
+
+### Device Type Aliases
+
+| Alias | Type |
+|---|---|
+| `dint1` .. `dint5` | `JIDeviceArray<int, 1>` .. `JIDeviceArray<int, 5>` |
+| `dfloat1` .. `dfloat5` | `JIDeviceArray<float, 1>` .. `JIDeviceArray<float, 5>` |
+| `ddouble1` .. `ddouble6` | `JIDeviceArray<double, 1>` .. `JIDeviceArray<double, 6>` |
+| `darray<T, N, Index>` | `JIDeviceArray<T, N, Index>` |
+| `X::View` / `X::ConstView` | `JIDeviceView<T, N, Index>` / `JIDeviceView<const T, N, Index>` |
+
+`d` stands for device. The `c*` names (`cdouble2`, ...) are already global macros
+of `JICudaArray.h`, and `f*` are FastArray, so a `c`/`f` prefix would collide.
+These are namespaced `using` aliases, like the `z*` ones.
+
+### Allocation
+
+```cpp
+ddouble3 flux(ng, nxy, nz);       // cudaMalloc, zero-filled, indices start at JIARRAY_OFFSET
+dint2 map;
+map.init0(0, 2, -1, 3);           // map(0..2, -1..3), as JIArray::init0
+map.setOffsets(1, 1);             // re-base; views taken afterwards see the new offsets
+dfloat2 work;
+work.initAsync(stream, 216, n);   // cudaMallocAsync + cudaMemsetAsync on `stream`;
+                                  // released with cudaFreeAsync on the same stream
+ddouble3 owner = std::move(flux); // ownership moves; flux is empty
+owner.destroy();                  // explicit release (the destructor does the same)
+```
+
+New memory is zero-filled, matching `JIArray::init`. Sizes and the offset-folded
+index range must fit in `Index`. If they do not, `init` throws `std::length_error`;
+use a 64-bit `Index` instead.
+
+### Host-Device Transfer
+
+```cpp
+zdouble3 host(ng, nxy, nz);
+ddouble3 dev;
+dev = host;                   // allocate to host's sizes AND offsets, upload (blocking)
+dev.copyTo(host);             // download (blocking); an empty host array is allocated
+
+dfloat3 dev32;
+dev32.uploadAs(host);         // FP64 -> FP32 conversion on upload (host staging buffer)
+zdouble3 back;
+dev32.copyTo(back);           // FP32 -> FP64 on download (copyTo converts when types differ)
+
+dev.copyFromAsync(host, stream);  // cudaMemcpyAsync; shapes must already match
+dev.copyToAsync(host, stream);    // read `host` only after the stream is synchronized
+dev.fillAsync(1.0, stream);       // grid-stride fill kernel (nvcc only)
+```
+
+- If the target is already allocated, its sizes and offsets must equal those of the
+  source. Otherwise `std::invalid_argument` is thrown. This check always runs; it
+  does not depend on `JIARRAY_DEBUG`.
+- An empty host source empties the device array, as JIArray copy assignment does.
+- The async copies overlap with host work only when the host array lives in pinned
+  memory.
+
+### Kernel Views and Indexing
+
+```cpp
+__global__ void scale(ddouble3::View flux, ddouble1::ConstView factor) {
+    const int ixy = blockIdx.x * blockDim.x + threadIdx.x + 1;  // 1-based
+    if (ixy > flux.getSize(2)) return;
+    zfor (iz, flux.getSize(3)) {
+        zfor (ig, flux.getSize(1)) {
+            flux(ig, ixy, iz) *= factor(ig);
+        }
+    }
+}
+scale<<<grid, block>>>(flux.view(), factor.view());
+```
+
+Views use the same names and meanings as JIArray:
+
+| Member | Meaning |
+|---|---|
+| `a(i, j, ...)`, `a.at(...)` | element at offset-relative indices |
+| `a(FastArray<int, RANK>)` | element at a FastArray of indices |
+| `a[n]` | 0-based flat element |
+| `a.data()`, `a.data(i, ...)` | device pointer to the start / to the partial-index position (as `JIArray::data(INDEX...)`) |
+| `size()`, `getSize()`, `getSize(r)` | element count / extent of dimension `r` (numbered from `JIARRAY_OFFSET`) |
+| `getSizeOfRank()`, `getRankSize()`, `getOffset()`, `getOffset(r)` | extents, strides, first indices |
+| `slice(i, ...)` | lower-rank view. Column-major fixes the **trailing** dimensions (`a.slice(k)` = `a(:, :, k)`), row-major the **leading** ones, exactly as JIArray |
+| `reshape(n1, n2, ...)` | same elements, new shape, default offsets |
+| `setOffsets(...)` | re-base this view |
+
+`slice`, `reshape` and `setOffsets` only change metadata. They also work inside
+kernels (`ddouble1::View line = a.slice(j, k);`). The owner has the same queries,
+plus `slice`/`reshape`/`data(i, ...)`, which return views or device pointers. To
+wrap an external device buffer, use `ddouble2::View v(device_ptr, n1, n2);`.
+
+**Constness follows `std::span`, not JIArray.** A `const` view object still writes
+its elements. For read-only access, use `ConstView` (`JIDeviceView<const T>`).
+That is what `view()` on a `const` owner returns, and `View` converts to it
+implicitly.
+
+**Lifetime.** A view never frees memory. It must not outlive its owner, and it must
+not be used after `init`/`destroy` on the owner reallocates or frees the memory
+(the same rule as JIArray views).
+
+### Indexing Cost
+
+`a(i, j, k)` compiles to the same address arithmetic as a hand-written 0-based raw
+index `p[i + nx * (j + ny * k)]`:
+
+- When the view is built, the offsets are folded into a shifted base pointer
+  (`origin = data - Σ offset·stride`). No `- offset` term remains in the access.
+- Every view is contiguous: allocation, `slice` and `reshape` all preserve this.
+  So the fastest dimension has unit stride, and its multiply is dropped at compile
+  time.
+- The linear index is computed in `Index` (`int` by default, 32-bit
+  multiply-adds). For arrays beyond 2^31 elements, use
+  `JIDeviceArray<T, RANK, long long>`.
+
+Measurements on an RTX 4090 (CUDA 12.6, sm_89). Kernel times are the medians of
+51 interleaved launches, taken over 3 runs of `dnegri.jiarray.device_array_bench`.
+Instruction counts come from `cuobjdump -sass`:
+
+| Kernel (FP64) | raw `__restrict__` | raw | view | view + `__ldg` |
+|---|---|---|---|---|
+| 7-point stencil 256³ | 0.287 ms / 50 SASS | 0.290 ms / 50 | 0.292 ms / 53 | 0.290 ms / 57 |
+| 216×216 GEMV × 20000 nodes | 1.459 ms / 191 | 1.459 ms / 191 | 1.457 ms / 200 | -- |
+
+A single access costs the same as raw (two `IMAD` + one `IMAD.WIDE` for rank 3).
+In the stencil, the remaining few instructions come from `out` carrying its own
+strides. The raw kernel reuses `in`'s index `c` for `out[c]`; the view kernel
+cannot know that the two shapes match. Kernel arguments cannot carry
+`__restrict__` on struct members, so loads do not take the read-only path by
+default. Where that matters, write `__ldg(&a(i, j, k))`.
+
+**Compile-time extents (not implemented).** A fixed extent such as the 216 face
+moments could be given as a template argument
+(`JIDeviceView<T, 2, int, Extent<216, kDynamic>>`), with strides that are
+compile-time constants. The measured gain was small. `gemvRawFixed` (stride 216
+as a literal) runs 0.3 % faster than the same kernel with the stride as a
+runtime argument. On the GPU a runtime stride is a constant-bank operand of the
+same `IMAD`, so the template is deferred until a kernel shows a real need.
+
+### Debug Checks
+
+With `JIARRAY_DEBUG`, indices, `getSize(r)`/`getOffset(r)`, `slice` indices and
+`reshape` sizes are checked:
+
+- On the host, these checks throw the same exceptions as JIArray
+  (`std::out_of_range`, `std::invalid_argument`).
+- In a kernel, a failed check prints the index and its range, then calls
+  `__trap()`. The kernel aborts, and the next synchronization returns
+  `cudaErrorLaunchFailure`.
+
+Without `JIARRAY_DEBUG`, these checks compile to nothing.
+
+### CUDA Tests
+
+```bash
+cmake -S . -B build-cuda -DJIARRAY_WITH_CUDA_TESTS=ON   # CMAKE_CUDA_ARCHITECTURES defaults to native
+cmake --build build-cuda -j 8
+ctest --test-dir build-cuda -R DeviceArray --output-on-failure
+./build-cuda/dnegri.jiarray.device_array_bench          # raw vs view timing
+```
+
+This builds three test executables:
+
+- `device_array_test`: the column-major build.
+- `device_array_rowmajor_test`: the same source built row-major.
+- `device_array_host_test`: the header built by the host compiler only.
+
+The default (non-CUDA) build is unchanged.
 
 ---
 
