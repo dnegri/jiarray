@@ -422,11 +422,12 @@ public:
     }
 
     JIARRAY_HD inline T& operator()(const FastArray<int, RANK>& idx) {
-        int pos = idx(1) - sumOfOffset;
-        JIARRAY_CHECK_BOUND(idx(1), offset[0], offset[0] + this->sizes[0] - 1);
+        // idx[i] is 0-based flat access, so it is right for any JIARRAY_OFFSET.
+        int pos = idx[0] - sumOfOffset;
+        JIARRAY_CHECK_BOUND(idx[0], offset[0], offset[0] + this->sizes[0] - 1);
         for (int i = 1; i < RANK; i++) {
-            JIARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + this->sizes[i] - 1);
-            pos += rankSize[i] * idx(i + 1);
+            JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
+            pos += rankSize[i] * idx[i];
         }
 
         return mm[pos];

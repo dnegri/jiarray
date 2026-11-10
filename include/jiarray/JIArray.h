@@ -917,9 +917,10 @@ JIARRAY_UNROLL
     JIARRAY_HD inline T& operator()(const FastArray<int, RANK>& idx) {
         int pos = -sumOfOffset;
 
+        // idx[i] is 0-based flat access, so it is right for any JIARRAY_OFFSET.
         for (int i = 0; i < RANK; i++) {
-            JIARRAY_CHECK_BOUND(idx(i + 1), offset[i], offset[i] + sizes[i] - 1);
-            pos += rankSize[i] * idx(i + 1);
+            JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + sizes[i] - 1);
+            pos += rankSize[i] * idx[i];
         }
 
         return mm[pos];

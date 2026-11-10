@@ -80,6 +80,16 @@ if(JIARRAY_BUILD_TESTS)
     _ji_add_gtest(move_lifecycle_test      ./test/move_lifecycle_test.cpp)
     _ji_add_gtest(ffor_test                ./test/ffor_test.cpp)
 
+    # FastArray-indexed access under both index bases and both storage orders
+    _ji_add_gtest(fast_array_index_test           ./test/fast_array_index_test.cpp)
+    _ji_add_gtest(fast_array_index_rowmajor_test  ./test/fast_array_index_test.cpp)
+    target_compile_options(${PROJECT_NAME}.fast_array_index_rowmajor_test PRIVATE -DJIARRAY_COLUMN_MAJOR=0)
+    _ji_add_gtest(fast_array_index_base0_test     ./test/fast_array_index_test.cpp)
+    target_compile_options(${PROJECT_NAME}.fast_array_index_base0_test PRIVATE -DJIARRAY_OFFSET=0)
+    _ji_add_gtest(fast_array_index_base0_rowmajor_test ./test/fast_array_index_test.cpp)
+    target_compile_options(${PROJECT_NAME}.fast_array_index_base0_rowmajor_test
+      PRIVATE -DJIARRAY_OFFSET=0 -DJIARRAY_COLUMN_MAJOR=0)
+
     # Column-major (default) + row-major variants of the main matrix suite
     _ji_add_gtest(column_major_test        ./test/column_major_test.cpp)
     _ji_add_gtest(row_major_test           ./test/row_major_test.cpp)
