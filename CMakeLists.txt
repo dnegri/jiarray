@@ -104,7 +104,8 @@ if(JIARRAY_BUILD_TESTS)
         set_target_properties(${PROJECT_NAME}.${name} PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
         target_link_libraries(${PROJECT_NAME}.${name}
           PRIVATE jiarray CUDA::cudart GTest::gtest_main GTest::gtest)
-        gtest_discover_tests(${PROJECT_NAME}.${name})
+        # The leak check reads device-wide free memory, so device tests must not run concurrently.
+        gtest_discover_tests(${PROJECT_NAME}.${name} PROPERTIES RESOURCE_LOCK cuda_device)
       endfunction()
 
       _ji_add_cuda_gtest(device_array_test          ./test/device_array_test.cu)
