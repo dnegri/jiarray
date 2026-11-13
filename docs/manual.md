@@ -1011,7 +1011,7 @@ These are namespaced `using` aliases, like the `z*` ones.
 ```cpp
 ddouble3 flux(ng, nxy, nz);       // cudaMalloc, zero-filled, indices start at JIARRAY_OFFSET
 dint2 map;
-map.init0(0, 2, -1, 3);           // map(0..2, -1..3), as JIArray::init0
+map.init0(0, 2, -1, 3);           // as JIArray::init0: map(0..2, -1..3) 1-based, map(0..1, -1..2) 0-based
 map.setOffsets(1, 1);             // re-base; views taken afterwards see the new offsets
 dfloat2 work;
 work.initAsync(stream, 216, n);   // cudaMallocAsync + cudaMemsetAsync on `stream`;

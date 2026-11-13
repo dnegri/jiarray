@@ -146,19 +146,24 @@ if(JIARRAY_BUILD_TESTS)
       # Same header through the host compiler only (no nvcc).
       _ji_add_cuda_gtest(device_array_host_test     ./test/device_array_host_test.cpp)
 
-      # JICudaArray init0 and device addressing: both index bases, with and without JIARRAY_DEBUG.
-      # JICudaArray is column-major only, so there is no row-major variant.
+      # init0 and device addressing on JICudaArray / JIDeviceArray: both index bases x both storage
+      # orders, each with and without JIARRAY_DEBUG.
       foreach(_ji_base 0 1)
-        foreach(_ji_debug debug nodebug)
-          set(_ji_name cuda_array_init0_base${_ji_base}_${_ji_debug}_test)
-          _ji_add_cuda_gtest(${_ji_name} ./test/cuda_array_init0_test.cu)
-          target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_OFFSET=${_ji_base})
-          if(_ji_debug STREQUAL "nodebug")
-            get_target_property(_ji_defs ${PROJECT_NAME}.${_ji_name} COMPILE_DEFINITIONS)
-            list(REMOVE_ITEM _ji_defs JIARRAY_DEBUG)
-            set_target_properties(${PROJECT_NAME}.${_ji_name} PROPERTIES COMPILE_DEFINITIONS "${_ji_defs}")
-            target_compile_options(${PROJECT_NAME}.${_ji_name} PRIVATE -UJIARRAY_DEBUG)
-          endif()
+        foreach(_ji_order col row)
+          foreach(_ji_debug debug nodebug)
+            set(_ji_name cuda_array_init0_base${_ji_base}_${_ji_order}_${_ji_debug}_test)
+            _ji_add_cuda_gtest(${_ji_name} ./test/cuda_array_init0_test.cu)
+            target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_OFFSET=${_ji_base})
+            if(_ji_order STREQUAL "row")
+              target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_COLUMN_MAJOR=0)
+            endif()
+            if(_ji_debug STREQUAL "nodebug")
+              get_target_property(_ji_defs ${PROJECT_NAME}.${_ji_name} COMPILE_DEFINITIONS)
+              list(REMOVE_ITEM _ji_defs JIARRAY_DEBUG)
+              set_target_properties(${PROJECT_NAME}.${_ji_name} PROPERTIES COMPILE_DEFINITIONS "${_ji_defs}")
+              target_compile_options(${PROJECT_NAME}.${_ji_name} PRIVATE -UJIARRAY_DEBUG)
+            endif()
+          endforeach()
         endforeach()
       endforeach()
 
