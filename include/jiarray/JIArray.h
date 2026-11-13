@@ -202,6 +202,8 @@ struct validate_index_count {
  *
  * @warning When using JIArray inside OpenMP parallel regions, set JIARRAY_USE_SIMD=0
  *          to avoid nested parallelism overhead.
+ * @note An array holds at most INT_MAX elements (checked at allocation, checkElementCount): positions are
+ *       64-bit sums on the host and 32-bit unsigned sums on the device, exact below that bound.
  */
 template <class T, size_t RANK, size_t... INTS>
 class JIArray<T, RANK, std::index_sequence<INTS...>> {
@@ -214,13 +216,15 @@ private:
     constexpr static bool is_row_major = (JIARRAY_COLUMN_MAJOR == 0);
 
     // Member variables
-    int nn        = 0;                      ///< Total number of elements
-    T*  mm        = nullptr;                ///< Pointer to data storage
-    int allocated = JIARRAY_ALLOCATED_NONE; ///< Allocation status flag
-    int rankSize[RANK]{};                   ///< Stride for each dimension
-    int offset[RANK]{};                     ///< Index offset for each dimension
-    int sumOfOffset = 0;                    ///< Precomputed sum of offsets
-    int sizes[RANK]{};                      ///< Size of each dimension
+    // sumOfOffset is 64-bit and sits next to the pointer, so the object does not grow.
+    int            nn          = 0;                      ///< Total number of elements
+    int            allocated   = JIARRAY_ALLOCATED_NONE; ///< Allocation status flag
+    T*             mm          = nullptr;                ///< Pointer to data storage
+    std::ptrdiff_t sumOfOffset = 0;                      ///< Sum of offset x stride; 64-bit because with a large
+                                                         ///< first index it passes INT_MAX long before nn does
+    int            rankSize[RANK]{};                     ///< Stride for each dimension
+    int            offset[RANK]{};                       ///< Index offset for each dimension
+    int            sizes[RANK]{};                        ///< Size of each dimension
 
     // ========================================================================
     // Private helper methods
@@ -234,28 +238,39 @@ private:
      * @note Uses manual loop unrolling for small ranks (≤ 4) for better performance
      */
     template <typename... Args>
-    JIARRAY_HD inline int calculateIndex(Args... indices) const {
+    JIARRAY_HD inline std::ptrdiff_t calculateIndex(Args... indices) const {
         static_assert(sizeof...(indices) == RANK, "Number of indices must match array rank");
         static_assert(all_integral_v<Args...>, "All indices must be integral types");
 
         const int idx[] = {static_cast<int>(indices)...};
-        int       pos   = -sumOfOffset;
+#ifdef __CUDA_ARCH__
+        // 32-bit unsigned on the device: the sum may pass INT_MAX on the way but wraps, and the position it ends
+        // at (below nn) comes out exact; 64-bit arithmetic here costs registers in hot kernels
+        unsigned pos = static_cast<unsigned>(-sumOfOffset);
+JIARRAY_UNROLL
+        for (int i = 0; i < RANK; i++) {
+            pos += static_cast<unsigned>(rankSize[i]) * static_cast<unsigned>(idx[i]);
+        }
+        return static_cast<int>(pos);
+#else
+        std::ptrdiff_t pos = -sumOfOffset;
 
         // Manual unrolling for small ranks
         if constexpr (RANK <= 4) {
 JIARRAY_UNROLL
             for (int i = 0; i < RANK; i++) {
                 JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + sizes[i] - 1);
-                pos += rankSize[i] * idx[i];
+                pos += static_cast<std::ptrdiff_t>(rankSize[i]) * idx[i];
             }
         } else {
             for (int i = 0; i < RANK; i++) {
                 JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + sizes[i] - 1);
-                pos += rankSize[i] * idx[i];
+                pos += static_cast<std::ptrdiff_t>(rankSize[i]) * idx[i];
             }
         }
 
         return pos;
+#endif
     }
 
     /**
@@ -366,8 +381,9 @@ public:
      *       (operator=(const this_type&)).
      */
     JIArray(const this_type& array) noexcept
-        : nn(array.nn), mm(array.mm),
+        : nn(array.nn),
           allocated(JIARRAY_ALLOCATED_NONE),
+          mm(array.mm),
           sumOfOffset(array.sumOfOffset) {
         std::copy(array.rankSize, array.rankSize + RANK, rankSize);
         std::copy(array.offset,   array.offset   + RANK, offset);
@@ -382,8 +398,9 @@ public:
      *       (no double-free) and can be reused via init().
      */
     JIArray(this_type&& other) noexcept
-        : nn(other.nn), mm(other.mm),
+        : nn(other.nn),
           allocated(other.allocated),
+          mm(other.mm),
           sumOfOffset(other.sumOfOffset) {
         std::copy(other.rankSize, other.rankSize + RANK, rankSize);
         std::copy(other.offset,   other.offset   + RANK, offset);
@@ -515,14 +532,11 @@ JIARRAY_UNROLL
         std::fill(offset, offset + RANK, JIARRAY_OFFSET);
 
         // Calculate total size and sum of offsets
-        nn = 1;
-        for (int i = 0; i < RANK; i++) {
-            nn *= dimensions[i];
-        }
+        nn = checkElementCount(dimensions, RANK);
 
         sumOfOffset = 0;
         for (int i = 0; i < RANK; i++) {
-            sumOfOffset += offset[i] * rankSize[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
         }
 
         mm        = new T[nn]{};
@@ -549,7 +563,7 @@ JIARRAY_UNROLL
 
         sumOfOffset = 0;
         for (int i = 0; i < RANK; i++) {
-            sumOfOffset += offset[i] * rankSize[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
         }
 
         allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
@@ -573,7 +587,7 @@ JIARRAY_UNROLL
         for (int i = 0; i < RANK; i++) {
             rankSize[i] = rankSizes[i];
             offset[i]   = offsets[i];
-            sumOfOffset += offset[i] * rankSize[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
         }
 
         mm        = memory;
@@ -667,7 +681,7 @@ JIARRAY_UNROLL
         std::copy(offsets, offsets + RANK, offset);
         sumOfOffset = 0;
         for (int i = 0; i < RANK; i++) {
-            sumOfOffset += rankSize[i] * offset[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(rankSize[i]) * offset[i];
         }
     }
 
@@ -863,7 +877,7 @@ JIARRAY_UNROLL
     template <typename... Args,
               typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
     JIARRAY_HD inline T& at(Args... index) {
-        int pos = calculateIndex(index...);
+        const std::ptrdiff_t pos = calculateIndex(index...);
         return mm[pos];
     }
 
@@ -872,7 +886,7 @@ JIARRAY_UNROLL
               typename = std::enable_if_t<all_integral_v<Args...> && (sizeof...(Args) == RANK)>>
     JIARRAY_HD inline const T&
     at(Args... index) const {
-        int pos = calculateIndex(index...);
+        const std::ptrdiff_t pos = calculateIndex(index...);
         return mm[pos];
     }
 
@@ -917,12 +931,12 @@ JIARRAY_UNROLL
      * @return Reference to element
      */
     JIARRAY_HD inline T& operator()(const FastArray<int, RANK>& idx) {
-        int pos = -sumOfOffset;
+        std::ptrdiff_t pos = -sumOfOffset;
 
         // idx[i] is 0-based flat access, so it is right for any JIARRAY_OFFSET.
         for (int i = 0; i < RANK; i++) {
             JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + sizes[i] - 1);
-            pos += rankSize[i] * idx[i];
+            pos += static_cast<std::ptrdiff_t>(rankSize[i]) * idx[i];
         }
 
         return mm[pos];
@@ -1810,7 +1824,15 @@ public:
             }
         }
 
-        ar(nn, rankSize, offset, sumOfOffset, sizes, allocated);
+        // The wire field stays a 32-bit int so archives keep their layout; the 64-bit sum is rebuilt on load.
+        int sum_of_offset_wire = static_cast<int>(sumOfOffset);
+        ar(nn, rankSize, offset, sum_of_offset_wire, sizes, allocated);
+        if constexpr (Archive::is_loading::value) {
+            sumOfOffset = 0;
+            for (int i = 0; i < RANK; i++) {
+                sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
+            }
+        }
 
         if constexpr (Archive::is_saving::value) {
             if (nn == 0) return;

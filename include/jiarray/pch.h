@@ -3,9 +3,11 @@
 #include <assert.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstddef> // For std::ptrdiff_t
 #include <iterator>
 #include <iterator> // For std::forward_iterator_tag
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -79,6 +81,20 @@ namespace dnegri::jiarray {
 #define JIARRAY_CHECK_RANK(r1, r2)
 #define JIARRAY_CHECK_SIZE(r1, r2)
 #endif
+
+/// @brief The element count of an array of `rank` dimensions `dims`, checked when it is allocated: an element's
+///        position is summed in 64 bits on the host but in 32-bit unsigned arithmetic on the device, which is exact
+///        only below INT_MAX, so no array may hold more. Throws std::length_error past it (host, at allocation only).
+inline int checkElementCount(const int* dims, int rank) {
+    long long count = 1;
+    for (int i = 0; i < rank; i++) {
+        count *= dims[i];
+        if (count > INT_MAX) {
+            throw std::length_error("jiarray: more elements than an int position can address");
+        }
+    }
+    return static_cast<int>(count);
+}
 
 #define JIARRAY_ALLOCATED_NONE 0
 #define JIARRAY_ALLOCATED_MEMORY 1

@@ -254,6 +254,13 @@ int offsets[] = {1, 1};
 arr.initByRankSize(6, rankSizes, offsets, buf);
 ```
 
+An array holds at most `INT_MAX` elements. Allocating `init` / `init0` (and
+`JICudaArray::init`) throw `std::length_error` past that bound instead of
+overflowing the `int` element count. The offset sum is 64-bit, so a small array whose
+first index is large (e.g. rows from 2,100,000 of 1,300 elements each) addresses
+exactly; an element's position is summed in 64 bits on the host and in 32-bit
+unsigned arithmetic on the device, both exact below the bound.
+
 ### Memory Management
 
 ```cpp
