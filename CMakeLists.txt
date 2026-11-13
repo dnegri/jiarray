@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(dnegri.jiarray VERSION 0.10.0 LANGUAGES C CXX)
+project(dnegri.jiarray VERSION 0.9.2 LANGUAGES C CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
