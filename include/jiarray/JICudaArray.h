@@ -17,15 +17,19 @@ namespace dnegri::jiarray {
 template <class T, std::size_t RANK = 1, class = std::make_index_sequence<RANK>>
 class JICudaArray;
 
+/// @brief Managed-memory array. It holds at most INT_MAX elements (checked at allocation, checkElementCount):
+///        positions are 64-bit sums on the host and 32-bit unsigned sums on the device, exact below that bound.
 template <class T, std::size_t RANK, std::size_t... INTS>
 class JICudaArray<T, RANK, std::index_sequence<INTS...>> {
 private:
     int nn        = 0;
-    T*  mm        = nullptr;
     int allocated = JIARRAY_ALLOCATED_NONE;
-    int rankSize[RANK]{};
-    int offset[RANK]{};
-    int sumOfOffset = 0;
+    T*  mm        = nullptr;
+    /// offset x stride summed in 64 bits: with a large first index it passes INT_MAX long before the element count
+    /// does; next to the pointer so the object keeps its size
+    std::ptrdiff_t sumOfOffset = 0;
+    int            rankSize[RANK]{};
+    int            offset[RANK]{};
 
     // private:
     // #ifdef JIARRAY_DEBUG
@@ -103,19 +107,20 @@ public:
         for (int i = 0; i < RANK; i++) {
             if (sizes[i] == 0) return;
         }
+        checkElementCount(sizes, RANK);
 
         int ioffset = 0;
 
         rankSize[0] = 1;
         offset[0]   = JIARRAY_OFFSET;
         nn          = sizes[0];
-        sumOfOffset = rankSize[0] * offset[0];
+        sumOfOffset = static_cast<std::ptrdiff_t>(rankSize[0]) * offset[0];
 
         for (int i = 1; i < RANK; i++) {
             rankSize[i] = rankSize[i - 1] * sizes[i - 1];
             offset[i]   = JIARRAY_OFFSET;
             nn *= sizes[i];
-            sumOfOffset += offset[i] * rankSize[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
         }
 
         // mm = new T[nn]{};
@@ -142,7 +147,7 @@ public:
         for (int i = 0; i < RANK; i++) {
             rankSize[i] = rankSizes[i];
             offset[i]   = offsets[i];
-            sumOfOffset += offset[i] * rankSize[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
         }
 
         mm = memory;
@@ -188,11 +193,11 @@ public:
         rankSize[0] = 1;
         offset[0]   = JIARRAY_OFFSET;
 
-        sumOfOffset = rankSize[0] * offset[0];
+        sumOfOffset = static_cast<std::ptrdiff_t>(rankSize[0]) * offset[0];
         for (int i = 1; i < RANK; i++) {
             offset[i]   = JIARRAY_OFFSET;
             rankSize[i] = rankSize[i - 1] * sizes[i - 1];
-            sumOfOffset += offset[i] * rankSize[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
         }
 
         allocated = JIARRAY_ALLOCATED_RANKSIZE_OFFSET;
@@ -236,7 +241,7 @@ public:
 
         sumOfOffset = 0;
         for (int i = 0; i < RANK; i++)
-            sumOfOffset += rankSize[i] * offset[i];
+            sumOfOffset += static_cast<std::ptrdiff_t>(rankSize[i]) * offset[i];
     }
 
     void setSize(index_size_t<INTS>... array_sizes) {
@@ -388,17 +393,26 @@ public:
 
         size_t idx[] = {index...};
 
-        int pos = -sumOfOffset;
+#ifdef __CUDA_ARCH__
+        // as JIArray::calculateIndex: 32-bit unsigned on the device, exact for any position below nn
+        unsigned pos = static_cast<unsigned>(-sumOfOffset);
+        for (int i = 0; i < sizeof...(index); i++) {
+            pos += static_cast<unsigned>(rankSize[i]) * static_cast<unsigned>(idx[i]);
+        }
+        return mm[static_cast<int>(pos)];
+#else
+        std::ptrdiff_t pos = -sumOfOffset;
         for (int i = 0; i < sizeof...(index); i++) {
             if (!(offset[i] <= idx[i] && idx[i] <= offset[i] + this->sizes[i] - 1)) {
                 JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
             }
 
             JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
-            pos += rankSize[i] * idx[i];
+            pos += static_cast<std::ptrdiff_t>(rankSize[i]) * static_cast<std::ptrdiff_t>(idx[i]);
         }
 
         return mm[pos];
+#endif
     }
 
     JIARRAY_HD inline const T& at(index_size_t<INTS>... index) const {
@@ -423,11 +437,11 @@ public:
 
     JIARRAY_HD inline T& operator()(const FastArray<int, RANK>& idx) {
         // idx[i] is 0-based flat access, so it is right for any JIARRAY_OFFSET.
-        int pos = idx[0] - sumOfOffset;
+        std::ptrdiff_t pos = idx[0] - sumOfOffset;
         JIARRAY_CHECK_BOUND(idx[0], offset[0], offset[0] + this->sizes[0] - 1);
         for (int i = 1; i < RANK; i++) {
             JIARRAY_CHECK_BOUND(idx[i], offset[i], offset[i] + this->sizes[i] - 1);
-            pos += rankSize[i] * idx[i];
+            pos += static_cast<std::ptrdiff_t>(rankSize[i]) * idx[i];
         }
 
         return mm[pos];
@@ -1133,7 +1147,15 @@ public:
             }
         }
 
-        ar(nn, rankSize, offset, sumOfOffset, sizes, allocated);
+        // The wire field stays a 32-bit int so archives keep their layout; the 64-bit sum is rebuilt on load.
+        int sum_of_offset_wire = static_cast<int>(sumOfOffset);
+        ar(nn, rankSize, offset, sum_of_offset_wire, sizes, allocated);
+        if constexpr (Archive::is_loading::value) {
+            sumOfOffset = 0;
+            for (int i = 0; i < RANK; i++) {
+                sumOfOffset += static_cast<std::ptrdiff_t>(offset[i]) * rankSize[i];
+            }
+        }
 
         if constexpr (Archive::is_saving::value) {
             if (nn == 0) return;

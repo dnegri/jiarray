@@ -37,7 +37,7 @@ TEST(FastArrayIndexTest, Rank3MatchesScalarIndex) {
 
 TEST(FastArrayIndexTest, CustomOffsetsMatchScalarIndex) {
     zint2 arr;
-    arr.init0(-1, 1, 5, 7);
+    arr.init0(-1, 2 - kBase, 5, 8 - kBase); // [-1, 1] x [5, 7]: init0's end is exclusive when 0-based
     for (int i = -1; i <= 1; ++i)
         for (int j = 5; j <= 7; ++j)
             arr(i, j) = 100 * i + j;

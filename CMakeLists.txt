@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(dnegri.jiarray C CXX)
+project(dnegri.jiarray VERSION 0.10.0 LANGUAGES C CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -90,6 +90,27 @@ if(JIARRAY_BUILD_TESTS)
     target_compile_options(${PROJECT_NAME}.fast_array_index_base0_rowmajor_test
       PRIVATE -DJIARRAY_OFFSET=0 -DJIARRAY_COLUMN_MAJOR=0)
 
+    # init0 range and large-offset addressing: both index bases x both storage orders,
+    # each with and without JIARRAY_DEBUG (-U undoes the Debug-config -DJIARRAY_DEBUG).
+    foreach(_ji_base 0 1)
+      foreach(_ji_order col row)
+        foreach(_ji_debug debug nodebug)
+          set(_ji_name init0_base${_ji_base}_${_ji_order}_${_ji_debug}_test)
+          _ji_add_gtest(${_ji_name} ./test/init0_test.cpp)
+          target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_OFFSET=${_ji_base})
+          if(_ji_order STREQUAL "row")
+            target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_COLUMN_MAJOR=0)
+          endif()
+          if(_ji_debug STREQUAL "nodebug")
+            get_target_property(_ji_defs ${PROJECT_NAME}.${_ji_name} COMPILE_DEFINITIONS)
+            list(REMOVE_ITEM _ji_defs JIARRAY_DEBUG)
+            set_target_properties(${PROJECT_NAME}.${_ji_name} PROPERTIES COMPILE_DEFINITIONS "${_ji_defs}")
+            target_compile_options(${PROJECT_NAME}.${_ji_name} PRIVATE -UJIARRAY_DEBUG)
+          endif()
+        endforeach()
+      endforeach()
+    endforeach()
+
     # Column-major (default) + row-major variants of the main matrix suite
     _ji_add_gtest(column_major_test        ./test/column_major_test.cpp)
     _ji_add_gtest(row_major_test           ./test/row_major_test.cpp)
@@ -124,6 +145,27 @@ if(JIARRAY_BUILD_TESTS)
         PRIVATE JIARRAY_COLUMN_MAJOR=0)
       # Same header through the host compiler only (no nvcc).
       _ji_add_cuda_gtest(device_array_host_test     ./test/device_array_host_test.cpp)
+
+      # init0 and device addressing on JICudaArray / JIDeviceArray: both index bases x both storage
+      # orders, each with and without JIARRAY_DEBUG.
+      foreach(_ji_base 0 1)
+        foreach(_ji_order col row)
+          foreach(_ji_debug debug nodebug)
+            set(_ji_name cuda_array_init0_base${_ji_base}_${_ji_order}_${_ji_debug}_test)
+            _ji_add_cuda_gtest(${_ji_name} ./test/cuda_array_init0_test.cu)
+            target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_OFFSET=${_ji_base})
+            if(_ji_order STREQUAL "row")
+              target_compile_definitions(${PROJECT_NAME}.${_ji_name} PRIVATE JIARRAY_COLUMN_MAJOR=0)
+            endif()
+            if(_ji_debug STREQUAL "nodebug")
+              get_target_property(_ji_defs ${PROJECT_NAME}.${_ji_name} COMPILE_DEFINITIONS)
+              list(REMOVE_ITEM _ji_defs JIARRAY_DEBUG)
+              set_target_properties(${PROJECT_NAME}.${_ji_name} PROPERTIES COMPILE_DEFINITIONS "${_ji_defs}")
+              target_compile_options(${PROJECT_NAME}.${_ji_name} PRIVATE -UJIARRAY_DEBUG)
+            endif()
+          endforeach()
+        endforeach()
+      endforeach()
 
       # Raw-pointer vs view timing; not a ctest (no JIARRAY_DEBUG, run by hand).
       add_executable(${PROJECT_NAME}.device_array_bench ./test/device_array_bench.cu)

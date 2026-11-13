@@ -159,10 +159,11 @@ public:
     }
 
     /**
-     * @brief Allocate from (first, last) index pairs, as `JIArray::init0`.
+     * @brief Allocate from (first, end) index pairs, as `JIArray::init0`: each range is
+     *        [first, end) when JIARRAY_OFFSET is 0 and [first, end] when it is 1.
      * @code
      * dint2 a;
-     * a.init0(0, 2, -1, 3);  // a(0..2, -1..3)
+     * a.init0(0, 2, -1, 3);  // 1-based: a(0..2, -1..3); 0-based: a(0..1, -1..2)
      * @endcode
      */
     template <typename... Bounds>
@@ -172,7 +173,7 @@ public:
         long long first[RANK];
         for (size_t d = 0; d < RANK; ++d) {
             first[d] = pairs[2 * d];
-            dimensions[d] = pairs[2 * d + 1] - pairs[2 * d] + 1;
+            dimensions[d] = pairs[2 * d + 1] - pairs[2 * d] + JIARRAY_OFFSET;
         }
         allocate(dimensions, nullptr, DeviceAllocation::Blocking);
         applyOffsets(first);
