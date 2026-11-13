@@ -121,12 +121,15 @@ arr(0) = 10;           // first element
 arr(4) = 50;           // last element
 ```
 
-**Custom offsets per dimension** with `init0()`:
+**Custom offsets per dimension** with `init0(first, end, ...)`. The range follows the
+index base, as `ffor` does: `[first, end]` with `JIARRAY_OFFSET=1`, `[first, end)` with
+`JIARRAY_OFFSET=0` (so `first == end` allocates nothing when 0-based):
 ```cpp
 zdouble2 arr;
-arr.init0(5, 10, 20, 25);   // dim1: [5..10], dim2: [20..25]
-arr(5, 20) = 1.0;           // valid
-arr(10, 25) = 2.0;          // valid
+arr.init0(5, 10, 20, 25);   // 1-based: dim1 [5..10], dim2 [20..25]  (6 x 6)
+                            // 0-based: dim1 [5..9],  dim2 [20..24]  (5 x 5)
+arr(5, 20) = 1.0;           // valid in both
+arr(9, 24) = 2.0;           // valid in both; arr(10, 25) only when 1-based
 ```
 
 **Custom offsets after init** with `setOffsets()`:
@@ -230,7 +233,7 @@ arr.init(3, 4);
 
 // init0() -- allocate with custom index ranges
 zdouble2 arr;
-arr.init0(5, 10, 20, 25);     // dim1=[5..10], dim2=[20..25]
+arr.init0(5, 10, 20, 25);     // dim1=[5..10], dim2=[20..25] (1-based); [5..9], [20..24] (0-based)
 
 // init() with external memory
 double buf[12];

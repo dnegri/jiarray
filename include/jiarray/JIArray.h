@@ -451,14 +451,16 @@ public:
     // ========================================================================
 
     /**
-     * @brief Initialize with range specifications (min, max pairs)
+     * @brief Initialize with range specifications (first, end pairs)
      * @tparam INTS2 Integer types for range specifications
-     * @param array_sizes Alternating min and max values for each dimension
-     * @note Expects 2*RANK arguments: min1, max1, min2, max2, ...
+     * @param array_sizes Alternating first and end values for each dimension
+     * @note Expects 2*RANK arguments: first1, end1, first2, end2, ...; each range is
+     *       [first, end) when JIARRAY_OFFSET is 0 and [first, end] when it is 1, like ffor
+     *       and like JICudaArray::init0. first == end (0-based) allocates nothing.
      *
      * @code
      * zint2 arr;
-     * arr.init0(1, 3, 1, 4);  // Creates 3x4 array with indices [1:3, 1:4]
+     * arr.init0(1, 3, 1, 4);  // 1-based: a 3x4 array with indices [1:3, 1:4]; 0-based: 2x3, [1, 3) x [1, 4)
      * @endcode
      */
     template <typename... INTS2>
@@ -472,7 +474,7 @@ public:
 
 JIARRAY_UNROLL
         for (int i = 0; i < RANK; i++) {
-            dimensions[i] = temp_size[2 * i + 1] - temp_size[2 * i] + 1;
+            dimensions[i] = temp_size[2 * i + 1] - temp_size[2 * i] + JIARRAY_OFFSET;
             offsets[i]    = temp_size[2 * i];
         }
 
